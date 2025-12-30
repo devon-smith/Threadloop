@@ -8,7 +8,7 @@ type AuthContextType = {
   campus: Campus | null;
   sessionId: string | null;
   isLoading: boolean;
-  login: (email: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateStyleProfile: (profile: {
     styleVibes: string[];
@@ -31,28 +31,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load session from localStorage on mount
+  // Load user from server-side session on mount
   useEffect(() => {
-    const storedSessionId = localStorage.getItem('threadloop_session');
-    if (storedSessionId) {
-      fetchCurrentUser(storedSessionId);
-    } else {
-      setIsLoading(false);
-    }
+    fetchCurrentUser();
   }, []);
 
-  const fetchCurrentUser = async (sessionId: string) => {
+  const fetchCurrentUser = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${sessionId}`
-        }
-      });
+      const response = await fetch(`${API_BASE_URL}/auth/me`);
 
       const data = await response.json();
       if (data.success && data.data) {
         setUser(data.data);
-        setSessionId(sessionId);
+        setSessionId('active');
 
         // Fetch campus info
         const campusResponse = await fetch(`${API_BASE_URL}/auth/campuses`);
@@ -61,70 +52,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userCampus = campusData.data.find((c: Campus) => c.id === data.data.campusId);
           if (userCampus) setCampus(userCampus);
         }
-      } else {
-        localStorage.removeItem('threadloop_session');
       }
     } catch (error) {
       console.error('Failed to fetch user:', error);
-      localStorage.removeItem('threadloop_session');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const login = async (email: string) => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-
-      const data = await response.json();
-
-      if (data.success && data.data) {
-        setUser(data.data.user);
-        setCampus(data.data.campus);
-        setSessionId(data.data.sessionId);
-        localStorage.setItem('threadloop_session', data.data.sessionId);
-        return { success: true };
-      } else {
-        return { success: false, error: data.error || 'Login failed' };
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, error: 'Network error. Please try again.' };
-    }
+  const login = async (_email?: string) => {
+    // Redirect-based login via Auth0
+    window.location.href = `${API_BASE_URL}/auth/login`;
+    return { success: true };
   };
 
   const logout = async () => {
-    if (sessionId) {
-      try {
-        await fetch(`${API_BASE_URL}/auth/logout`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${sessionId}`
-          }
-        });
-      } catch (error) {
-        console.error('Logout error:', error);
-      }
+    try {
+      await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error:', error);
     }
 
     setUser(null);
     setCampus(null);
     setSessionId(null);
-    localStorage.removeItem('threadloop_session');
   };
 
   const updateStyleProfile = async (profile: AuthContextType['updateStyleProfile'] extends (arg: infer P) => any ? P : never) => {
-    if (!sessionId) throw new Error('Not authenticated');
-
     const response = await fetch(`${API_BASE_URL}/auth/style-profile`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionId}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(profile)
     });
@@ -136,13 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfile = async (updates: { displayName?: string; bio?: string; avatarUrl?: string }) => {
-    if (!sessionId) throw new Error('Not authenticated');
-
     const response = await fetch(`${API_BASE_URL}/auth/profile`, {
       method: 'PUT',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionId}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(updates)
     });
