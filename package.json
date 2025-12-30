@@ -1,0 +1,17 @@
+{
+  "name": "threadloop",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "pnpm --filter @threadloop/api dev",
+    "dev:mobile": "pnpm --filter @threadloop/mobile start",
+    "dev:web": "pnpm --filter @threadloop/web dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  }
+}
