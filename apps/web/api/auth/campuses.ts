@@ -1,4 +1,4 @@
-import { campuses, ok, methodNotAllowed } from '../../api/_data';
+import { campuses, ok, methodNotAllowed } from '../_data';
 
 export default function handler(req: any, res: any) {
   if (req.method !== 'GET') return methodNotAllowed(res);
