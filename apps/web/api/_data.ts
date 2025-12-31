@@ -74,7 +74,8 @@ export const listings: Listing[] = [
 
 export function withJson(res: any, status: number, body: any) {
   res.setHeader('Content-Type', 'application/json');
-  res.status(status).json(body);
+  res.statusCode = status;
+  res.end(JSON.stringify(body));
 }
 
 export function ok(res: any, body: any) {
