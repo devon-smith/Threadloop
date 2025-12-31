@@ -1,7 +1,8 @@
 import { ok, unauthorized, methodNotAllowed } from '../_data.js';
 import { createSession, readSessionCookie, setSessionCookie } from '../_session.js';
+import { getSupabaseAdmin } from '../_supabase.js';
 
-export default function handler(req: any, res: any) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'PUT') return methodNotAllowed(res);
 
   const env = (globalThis as any)?.process?.env as Record<string, string | undefined> | undefined;
@@ -19,6 +20,24 @@ export default function handler(req: any, res: any) {
       ...(updates as any)?.sizingProfile
     }
   };
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    const now = new Date();
+    const { error } = await supabase
+      .from('users')
+      .update({
+        style_vibes: (updated as any).styleVibes || [],
+        favorite_colors: (updated as any).favoriteColors || [],
+        sizing_profile: (updated as any).sizingProfile || {},
+        updated_at: now.toISOString()
+      })
+      .eq('id', (updated as any).id);
+
+    if (error) {
+      console.error('Supabase users style update failed:', error);
+    }
+  }
 
   const appBaseUrl = env?.APP_BASE_URL || '/';
   const token = createSession(updated, secret);

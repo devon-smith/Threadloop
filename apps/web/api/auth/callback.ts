@@ -1,5 +1,6 @@
 import { badRequest, campuses } from '../_data.js';
 import { createSession, setSessionCookie } from '../_session.js';
+import { getSupabaseAdmin } from '../_supabase.js';
 
 export default async function handler(req: any, res: any) {
   const { code } = req.query || {};
@@ -107,6 +108,31 @@ export default async function handler(req: any, res: any) {
         pushNotifications: false
       }
     };
+
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      const now = new Date();
+      const { error } = await supabase
+        .from('users')
+        .upsert(
+          {
+            id: profile.id,
+            email: profile.email,
+            campus_id: profile.campusId,
+            display_name: profile.displayName,
+            avatar_url: profile.avatarUrl ?? null,
+            bio: profile.bio ?? null,
+            email_verified: profile.emailVerified,
+            last_login: now.toISOString(),
+            updated_at: now.toISOString()
+          },
+          { onConflict: 'id' }
+        );
+
+      if (error) {
+        console.error('Supabase user upsert failed:', error);
+      }
+    }
 
     // Create session and set cookie
     const token = createSession(profile, sessionSecret);

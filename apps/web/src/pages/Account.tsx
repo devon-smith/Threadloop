@@ -7,6 +7,7 @@ type UserProfile = {
   email: string;
   campus: string;
   bio: string;
+  avatarUrl: string;
   measurements: {
     topSize: string;
     bottomSize: string;
@@ -26,6 +27,7 @@ export function Account() {
     email: 'student@university.edu',
     campus: 'Stanford University',
     bio: 'Love sustainable fashion and finding unique pieces!',
+    avatarUrl: '',
     measurements: {
       topSize: 'M',
       bottomSize: '28',
@@ -47,6 +49,7 @@ export function Account() {
       email: user.email,
       campus: campus.name,
       bio: user.bio || '',
+      avatarUrl: user.avatarUrl || '',
       measurements: {
         topSize: user.sizingProfile?.topSize || '',
         bottomSize: user.sizingProfile?.bottomSize || '',
@@ -77,7 +80,8 @@ export function Account() {
 
     await updateProfile({
       displayName: formData.displayName,
-      bio: formData.bio
+      bio: formData.bio,
+      avatarUrl: formData.avatarUrl || undefined
     });
 
     await updateStyleProfile({
@@ -124,7 +128,11 @@ export function Account() {
           <div className="profile-card">
             <div className="profile-header">
               <div className="avatar">
-                {profile.displayName.charAt(0).toUpperCase()}
+                {profile.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={profile.displayName} />
+                ) : (
+                  profile.displayName.charAt(0).toUpperCase()
+                )}
               </div>
               <div className="profile-stats">
                 <h2>{profile.displayName}</h2>
@@ -187,6 +195,15 @@ export function Account() {
             ) : (
               <form className="profile-form" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
                 <label className="field">
+                  <span>Profile Photo URL</span>
+                  <input
+                    value={formData.avatarUrl}
+                    onChange={handleChange('avatarUrl')}
+                    placeholder="https://..."
+                  />
+                </label>
+
+                <label className="field">
                   <span>Display Name</span>
                   <input
                     value={formData.displayName}
@@ -202,6 +219,7 @@ export function Account() {
                     value={formData.email}
                     onChange={handleChange('email')}
                     required
+                    disabled
                   />
                 </label>
 
@@ -211,6 +229,7 @@ export function Account() {
                     value={formData.campus}
                     onChange={handleChange('campus')}
                     required
+                    disabled
                   />
                 </label>
 

@@ -16,23 +16,103 @@ export const baseUser = {
 export const listings = [
   {
     id: 'l1',
+    sellerId: baseUser.id,
     title: 'Vintage Denim Jacket',
     description: 'Classic blue denim jacket in great condition',
     price: 35,
     category: 'Outerwear',
     size: 'M',
     condition: 'good',
-    campusId: campuses[0].id
+    status: 'active',
+    campusId: campuses[0].id,
+    images: [
+      {
+        id: 'img_l1_1',
+        listingId: 'l1',
+        storageUrl:
+          'https://images.unsplash.com/photo-1520975958225-226ceef5bb78?auto=format&fit=crop&w=1200&q=80'
+      }
+    ]
   },
   {
     id: 'l2',
+    sellerId: baseUser.id,
     title: 'Graphic Tee',
     description: 'Soft cotton tee with retro print',
     price: 12,
     category: 'Tops',
     size: 'L',
     condition: 'like_new',
-    campusId: campuses[0].id
+    status: 'active',
+    campusId: campuses[0].id,
+    images: [
+      {
+        id: 'img_l2_1',
+        listingId: 'l2',
+        storageUrl:
+          'https://images.unsplash.com/photo-1520975711539-615f0b3b5c67?auto=format&fit=crop&w=1200&q=80'
+      }
+    ]
+  },
+  {
+    id: 'l3',
+    sellerId: baseUser.id,
+    title: 'White Sneakers',
+    description: 'Clean white sneakers, worn a few times. Still super comfy.',
+    price: 28,
+    category: 'Shoes',
+    size: '9',
+    condition: 'good',
+    status: 'active',
+    campusId: campuses[0].id,
+    images: [
+      {
+        id: 'img_l3_1',
+        listingId: 'l3',
+        storageUrl:
+          'https://images.unsplash.com/photo-1528701800489-20be3c9f90fd?auto=format&fit=crop&w=1200&q=80'
+      }
+    ]
+  },
+  {
+    id: 'l4',
+    sellerId: baseUser.id,
+    title: 'Black Midi Dress',
+    description: 'Minimal black midi dress. Perfect for dinners or interviews.',
+    swapValue: 40,
+    category: 'Dresses',
+    size: 'S',
+    condition: 'like_new',
+    status: 'active',
+    campusId: campuses[0].id,
+    images: [
+      {
+        id: 'img_l4_1',
+        listingId: 'l4',
+        storageUrl:
+          'https://images.unsplash.com/photo-1520975958225-7e1e6fba9b5f?auto=format&fit=crop&w=1200&q=80'
+      }
+    ]
+  },
+  {
+    id: 'l5',
+    sellerId: baseUser.id,
+    title: 'Wool Beanie',
+    description: 'Warm wool beanie. Great for winter walks across campus.',
+    price: 10,
+    category: 'Accessories',
+    size: 'One Size',
+    condition: 'new',
+    status: 'active',
+    campusId: campuses[0].id,
+    images: [
+      {
+        id: 'img_l5_1',
+        listingId: 'l5',
+        storageUrl:
+          'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80'
+      }
+    ]
   }
 ];
 
