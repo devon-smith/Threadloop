@@ -1,4 +1,4 @@
-import { methodNotAllowed, withJson } from '../_data';
+import { methodNotAllowed, withJson } from '../_data.js';
 
 export default async function handler(req: any, res: any) {
   try {

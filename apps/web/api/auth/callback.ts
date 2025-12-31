@@ -1,5 +1,5 @@
-import { ok, badRequest } from '../_data';
-import { createSession, setSessionCookie } from '../_session';
+import { ok, badRequest } from '../_data.js';
+import { createSession, setSessionCookie } from '../_session.js';
 
 export default async function handler(req: any, res: any) {
   const { code } = req.query || {};

@@ -1,5 +1,5 @@
-import { ok, methodNotAllowed } from '../_data';
-import { clearSessionCookie } from '../_session';
+import { ok, methodNotAllowed } from '../_data.js';
+import { clearSessionCookie } from '../_session.js';
 
 export default function handler(req: any, res: any) {
   if (req.method !== 'POST') return methodNotAllowed(res);

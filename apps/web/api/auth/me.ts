@@ -1,5 +1,5 @@
-import { ok, unauthorized, methodNotAllowed } from '../_data';
-import { readSessionCookie } from '../_session';
+import { ok, unauthorized, methodNotAllowed } from '../_data.js';
+import { readSessionCookie } from '../_session.js';
 
 export default function handler(req: any, res: any) {
   if (req.method !== 'GET') return methodNotAllowed(res);

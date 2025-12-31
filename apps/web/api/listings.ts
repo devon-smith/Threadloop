@@ -1,4 +1,4 @@
-import { listings, ok, methodNotAllowed, withJson } from './_data';
+import { listings, ok, methodNotAllowed, withJson } from './_data.js';
 
 function uuid() {
   const c = (globalThis as any)?.crypto;

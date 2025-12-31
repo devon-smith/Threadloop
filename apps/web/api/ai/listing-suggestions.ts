@@ -1,4 +1,4 @@
-import { badRequest, methodNotAllowed, ok } from '../_data';
+import { badRequest, methodNotAllowed, ok } from '../_data.js';
 
 function readBody(req: any) {
   const body = req.body;
