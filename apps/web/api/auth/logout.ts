@@ -4,9 +4,15 @@ import { clearSessionCookie } from '../_session';
 export default function handler(req: any, res: any) {
   if (req.method !== 'POST') return methodNotAllowed(res);
 
-  const domain = process.env.AUTH0_DOMAIN!;
-  const clientId = process.env.AUTH0_CLIENT_ID!;
-  const returnTo = process.env.AUTH0_LOGOUT_REDIRECT || process.env.APP_BASE_URL || '/';
+  const env = (globalThis as any)?.process?.env as Record<string, string | undefined> | undefined;
+  const domain = env?.AUTH0_DOMAIN;
+  const clientId = env?.AUTH0_CLIENT_ID;
+  const returnTo = env?.AUTH0_LOGOUT_REDIRECT || env?.APP_BASE_URL || '/';
+
+  if (!domain || !clientId) {
+    clearSessionCookie(res);
+    return ok(res, { success: true });
+  }
 
   clearSessionCookie(res);
 

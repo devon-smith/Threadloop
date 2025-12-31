@@ -1,5 +1,10 @@
 import { listings, ok, methodNotAllowed, withJson } from './_data';
-import { randomUUID } from 'crypto';
+
+function uuid() {
+  const c = (globalThis as any)?.crypto;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  return `tl_${Date.now().toString(16)}_${Math.random().toString(16).slice(2)}`;
+}
 
 export default function handler(req: any, res: any) {
   if (req.method === 'GET') {
@@ -10,7 +15,7 @@ export default function handler(req: any, res: any) {
     const payload = req.body || {};
     const created = {
       ...payload,
-      id: payload.id || randomUUID()
+      id: payload.id || uuid()
     };
 
     listings.unshift(created as any);
