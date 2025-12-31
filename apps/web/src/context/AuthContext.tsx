@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { UserProfile as ExtendedUserProfile, Campus } from '@threadloop/shared';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
 
 type AuthContextType = {
   user: ExtendedUserProfile | null;

@@ -2,7 +2,9 @@ import { useState, useCallback } from 'react';
 import type { Listing } from '@threadloop/shared';
 import { calculateDemandScore, getSeasonalInsights, suggestPricing } from '../utils/seasonalDemand';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
 const DEFAULT_SELLER_ID = '11111111-1111-1111-1111-111111111111';
 const DEFAULT_CAMPUS_ID = '22222222-2222-2222-2222-222222222222';
 
