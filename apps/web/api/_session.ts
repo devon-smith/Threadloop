@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 
 const COOKIE_NAME = 'threadloop_session';
 

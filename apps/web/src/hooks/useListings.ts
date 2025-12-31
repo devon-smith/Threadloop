@@ -14,10 +14,27 @@ export function useListings() {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/listings`);
-      const payload = await response.json();
-      if (!payload.success) {
-        throw new Error(payload.error ?? 'Failed to load listings');
+
+      const contentType = response.headers.get('content-type') ?? '';
+      const text = await response.text();
+
+      if (!contentType.includes('application/json')) {
+        throw new Error(
+          `Failed to load listings (HTTP ${response.status}). ${text ? text.slice(0, 200) : 'Non-JSON response.'}`
+        );
       }
+
+      let payload: any;
+      try {
+        payload = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`Failed to parse listings response (HTTP ${response.status}).`);
+      }
+
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error ?? `Failed to load listings (HTTP ${response.status})`);
+      }
+
       setData(payload.data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load listings');

@@ -27,6 +27,21 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function readJsonResponse(response: Response) {
+  const contentType = response.headers.get('content-type') ?? '';
+  const text = await response.text();
+
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Non-JSON response (HTTP ${response.status}). ${text ? text.slice(0, 200) : ''}`);
+  }
+
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error(`Failed to parse JSON response (HTTP ${response.status}).`);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<ExtendedUserProfile | null>(null);
   const [campus, setCampus] = useState<Campus | null>(null);
@@ -42,14 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/me`);
 
-      const data = await response.json();
+      const data = await readJsonResponse(response);
       if (data.success && data.data) {
         setUser(data.data);
         setSessionId('active');
 
         // Fetch campus info
         const campusResponse = await fetch(`${API_BASE_URL}/auth/campuses`);
-        const campusData = await campusResponse.json();
+        const campusData = await readJsonResponse(campusResponse);
         if (campusData.success) {
           const userCampus = campusData.data.find((c: Campus) => c.id === data.data.campusId);
           if (userCampus) setCampus(userCampus);

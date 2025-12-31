@@ -2,7 +2,7 @@ import { methodNotAllowed, withJson } from '../_data';
 
 export default async function handler(req: any, res: any) {
   try {
-    const method = typeof req?.method === 'string' ? req.method : (req instanceof Request ? req.method : undefined);
+    const method = typeof req?.method === 'string' ? req.method : undefined;
     if (method !== 'GET') return methodNotAllowed(res);
 
     const env = (typeof process !== 'undefined' ? process.env : undefined) as Record<string, string | undefined> | undefined;
@@ -28,7 +28,11 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!res || typeof res.writeHead !== 'function' || typeof res.end !== 'function') {
-      return new Response(null, {
+      const ResponseCtor = (globalThis as any)?.Response as typeof Response | undefined;
+      if (!ResponseCtor) {
+        return withJson(res, 500, { success: false, error: 'Response is not available in this runtime' });
+      }
+      return new ResponseCtor(null, {
         status: 302,
         headers: {
           Location: authorizeUrl.toString()
