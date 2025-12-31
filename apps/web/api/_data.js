@@ -29,8 +29,7 @@ export const listings = [
       {
         id: 'img_l1_1',
         listingId: 'l1',
-        storageUrl:
-          'https://images.unsplash.com/photo-1520975958225-226ceef5bb78?auto=format&fit=crop&w=1200&q=80'
+        storageUrl: 'https://source.unsplash.com/1200x900/?denim,jacket'
       }
     ]
   },
@@ -49,8 +48,7 @@ export const listings = [
       {
         id: 'img_l2_1',
         listingId: 'l2',
-        storageUrl:
-          'https://images.unsplash.com/photo-1520975711539-615f0b3b5c67?auto=format&fit=crop&w=1200&q=80'
+        storageUrl: 'https://source.unsplash.com/1200x900/?graphic,tshirt'
       }
     ]
   },
@@ -69,8 +67,7 @@ export const listings = [
       {
         id: 'img_l3_1',
         listingId: 'l3',
-        storageUrl:
-          'https://images.unsplash.com/photo-1528701800489-20be3c9f90fd?auto=format&fit=crop&w=1200&q=80'
+        storageUrl: 'https://source.unsplash.com/1200x900/?sneakers,shoes'
       }
     ]
   },
@@ -89,8 +86,7 @@ export const listings = [
       {
         id: 'img_l4_1',
         listingId: 'l4',
-        storageUrl:
-          'https://images.unsplash.com/photo-1520975958225-7e1e6fba9b5f?auto=format&fit=crop&w=1200&q=80'
+        storageUrl: 'https://source.unsplash.com/1200x900/?black,dress'
       }
     ]
   },
@@ -109,8 +105,7 @@ export const listings = [
       {
         id: 'img_l5_1',
         listingId: 'l5',
-        storageUrl:
-          'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80'
+        storageUrl: 'https://source.unsplash.com/1200x900/?beanie,wool'
       }
     ]
   }

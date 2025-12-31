@@ -209,6 +209,9 @@ export function Profile() {
 
           {/* Actions */}
           <div className="profile-actions">
+            <button className="cta-primary" onClick={() => navigate('/account')}>
+              Add / Change Profile Photo
+            </button>
             <button className="ghost" onClick={() => navigate('/account')}>
               Edit Profile Settings
             </button>

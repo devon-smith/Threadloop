@@ -147,6 +147,9 @@ export function Account() {
                     <span className="stat-label">Swaps</span>
                   </div>
                 </div>
+                <button className="ghost" onClick={() => setEditing(true)}>
+                  {profile.avatarUrl ? 'Change profile photo' : 'Add profile photo'}
+                </button>
               </div>
             </div>
 
