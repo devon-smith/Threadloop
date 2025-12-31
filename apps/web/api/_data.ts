@@ -73,23 +73,35 @@ export const listings: Listing[] = [
 ];
 
 export function withJson(res: any, status: number, body: any) {
+  if (!res || typeof res.setHeader !== 'function' || typeof res.end !== 'function') {
+    if (typeof Response === 'undefined') {
+      throw new Error('Response is not available in this runtime');
+    }
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+
   res.setHeader('Content-Type', 'application/json');
   res.statusCode = status;
   res.end(JSON.stringify(body));
 }
 
 export function ok(res: any, body: any) {
-  withJson(res, 200, body);
+  return withJson(res, 200, body);
 }
 
 export function badRequest(res: any, message = 'Bad Request') {
-  withJson(res, 400, { success: false, error: message });
+  return withJson(res, 400, { success: false, error: message });
 }
 
 export function unauthorized(res: any, message = 'Unauthorized') {
-  withJson(res, 401, { success: false, error: message });
+  return withJson(res, 401, { success: false, error: message });
 }
 
 export function methodNotAllowed(res: any) {
-  withJson(res, 405, { success: false, error: 'Method Not Allowed' });
+  return withJson(res, 405, { success: false, error: 'Method Not Allowed' });
 }
