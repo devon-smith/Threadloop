@@ -35,10 +35,20 @@ const BADGE_INFO: Record<string, { label: string; icon: string; description: str
 };
 
 export function Profile() {
-  const { user, campus, logout } = useAuth();
+  const { user, campus, logout, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  if (!user || !campus) {
+  if (isLoading) {
+    return (
+      <div className="page-content">
+        <div className="empty-state">
+          <p>Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
     return (
       <div className="page-content">
         <div className="empty-state">
@@ -50,6 +60,8 @@ export function Profile() {
       </div>
     );
   }
+
+  const campusName = campus?.name ?? 'Your campus';
 
   const handleLogout = async () => {
     await logout();
@@ -71,7 +83,7 @@ export function Profile() {
             </div>
             <div className="profile-header-info">
               <h1>{user.displayName}</h1>
-              <p className="profile-campus">{campus.name}</p>
+              <p className="profile-campus">{campusName}</p>
               <p className="profile-email">{user.email}</p>
             </div>
           </div>

@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchCurrentUser = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`);
+      const response = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' });
 
       const data = await readJsonResponse(response);
       if (data.success && data.data) {
@@ -63,15 +63,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSessionId('active');
 
         // Fetch campus info
-        const campusResponse = await fetch(`${API_BASE_URL}/auth/campuses`);
+        const campusResponse = await fetch(`${API_BASE_URL}/auth/campuses`, { credentials: 'include' });
         const campusData = await readJsonResponse(campusResponse);
         if (campusData.success) {
           const userCampus = campusData.data.find((c: Campus) => c.id === data.data.campusId);
           if (userCampus) setCampus(userCampus);
         }
+      } else {
+        setUser(null);
+        setCampus(null);
+        setSessionId(null);
       }
     } catch (error) {
       console.error('Failed to fetch user:', error);
+      setUser(null);
+      setCampus(null);
+      setSessionId(null);
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST' });
+      await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -98,13 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateStyleProfile = async (profile: AuthContextType['updateStyleProfile'] extends (arg: infer P) => any ? P : never) => {
     const response = await fetch(`${API_BASE_URL}/auth/style-profile`, {
       method: 'PUT',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(profile)
     });
 
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (data.success && data.data) {
       setUser(data.data);
     }
@@ -113,13 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = async (updates: { displayName?: string; bio?: string; avatarUrl?: string }) => {
     const response = await fetch(`${API_BASE_URL}/auth/profile`, {
       method: 'PUT',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(updates)
     });
 
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (data.success && data.data) {
       setUser(data.data);
     }

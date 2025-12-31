@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 type UserProfile = {
   displayName: string;
@@ -16,6 +18,9 @@ type UserProfile = {
 };
 
 export function Account() {
+  const { user, campus, updateProfile, updateStyleProfile } = useAuth();
+  const navigate = useNavigate();
+
   const [profile, setProfile] = useState<UserProfile>({
     displayName: 'Student User',
     email: 'student@university.edu',
@@ -34,6 +39,28 @@ export function Account() {
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState(profile);
 
+  useEffect(() => {
+    if (!user || !campus) return;
+
+    const nextProfile: UserProfile = {
+      displayName: user.displayName,
+      email: user.email,
+      campus: campus.name,
+      bio: user.bio || '',
+      measurements: {
+        topSize: user.sizingProfile?.topSize || '',
+        bottomSize: user.sizingProfile?.bottomSize || '',
+        shoeSize: user.sizingProfile?.shoeSize || ''
+      },
+      styleTags: (user.styleVibes as any) || [],
+      rating: user.rating || 0,
+      swapCount: user.swapCount || 0
+    };
+
+    setProfile(nextProfile);
+    setFormData(nextProfile);
+  }, [user, campus]);
+
   const handleChange = (field: keyof UserProfile) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
   };
@@ -45,7 +72,24 @@ export function Account() {
     }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!user) return;
+
+    await updateProfile({
+      displayName: formData.displayName,
+      bio: formData.bio
+    });
+
+    await updateStyleProfile({
+      styleVibes: formData.styleTags,
+      favoriteColors: user.favoriteColors || [],
+      sizingProfile: {
+        topSize: formData.measurements.topSize,
+        bottomSize: formData.measurements.bottomSize,
+        shoeSize: formData.measurements.shoeSize
+      }
+    });
+
     setProfile(formData);
     setEditing(false);
   };
@@ -54,6 +98,19 @@ export function Account() {
     setFormData(profile);
     setEditing(false);
   };
+
+  if (!user || !campus) {
+    return (
+      <div className="page-content">
+        <div className="empty-state">
+          <p>Please log in to view your account</p>
+          <button className="cta-primary" onClick={() => navigate('/login')}>
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-content">

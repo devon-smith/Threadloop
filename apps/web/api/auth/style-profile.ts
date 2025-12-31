@@ -1,5 +1,5 @@
-import { baseUser, ok, unauthorized, methodNotAllowed } from '../_data.js';
-import { readSessionCookie } from '../_session.js';
+import { ok, unauthorized, methodNotAllowed } from '../_data.js';
+import { createSession, readSessionCookie, setSessionCookie } from '../_session.js';
 
 export default function handler(req: any, res: any) {
   if (req.method !== 'PUT') return methodNotAllowed(res);
@@ -11,7 +11,18 @@ export default function handler(req: any, res: any) {
   if (!user) return unauthorized(res, 'Not authenticated');
 
   const updates = req.body || {};
-  const updated = { ...baseUser, ...user, ...updates };
+  const updated = {
+    ...user,
+    ...updates,
+    sizingProfile: {
+      ...(user as any)?.sizingProfile,
+      ...(updates as any)?.sizingProfile
+    }
+  };
+
+  const appBaseUrl = env?.APP_BASE_URL || '/';
+  const token = createSession(updated, secret);
+  setSessionCookie(res, token, appBaseUrl);
 
   return ok(res, { success: true, data: updated });
 }

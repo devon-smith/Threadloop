@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export function Login() {
@@ -7,7 +6,6 @@ export function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,8 +15,7 @@ export function Login() {
     const result = await login(email);
 
     if (result.success) {
-      // Check if user needs to complete style profile
-      navigate('/style-quiz');
+      return;
     } else {
       setError(result.error || 'Login failed');
     }
