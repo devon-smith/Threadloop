@@ -1,13 +1,5 @@
 export type UUID = string;
 
-export interface Campus {
-  id: UUID;
-  name: string;
-  domainWhitelist: string[];
-  geoBoundary: { lat: number; lng: number; radiusKm: number };
-  lockerLocations: string[];
-}
-
 export interface PublicProfileSummary {
   id: UUID;
   userId: UUID;

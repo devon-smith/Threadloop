@@ -53,7 +53,7 @@ export type UserProfile = {
   bio?: string;
 
   // Authentication
-  authProvider: 'google' | 'email';
+  authProvider: 'google' | 'email' | 'auth0';
   lastLogin: Date;
   createdAt: Date;
 
