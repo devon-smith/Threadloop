@@ -3,12 +3,16 @@ import { useAuth0 } from '@auth0/auth0-react';
 export function Login() {
   const { loginWithRedirect, isLoading } = useAuth0();
 
+  // Try different connection name variations
   const handleStanfordLogin = () => {
-    console.log('Attempting Stanford SAML login...');
+    console.log('Attempting Stanford SAML login with connection: stanford-saml');
+
+    // Try without specifying connection to see what options Auth0 shows
     loginWithRedirect({
       authorizationParams: {
-        connection: 'stanford-saml',
         redirect_uri: window.location.origin + '/callback',
+        // Temporarily commenting out connection to see all options
+        // connection: 'stanford-saml',
       }
     }).catch(err => {
       console.error('Stanford SAML login error:', err);
