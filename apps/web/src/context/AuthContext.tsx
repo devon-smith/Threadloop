@@ -50,13 +50,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log('Auth0 user data:', JSON.stringify(auth0User, null, 2));
 
+      // Check for email stored during login flow (for SAML users where IdP doesn't send email)
+      const pendingEmail = sessionStorage.getItem('pending_auth_email');
+
       // Extract email from various possible locations in Auth0/SAML response
-      // Stanford SAML may put email in different fields
+      // Fall back to the email the user entered before SAML redirect
       const email = auth0User.email
         || auth0User['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress']
         || auth0User.preferred_username
         || auth0User.upn
+        || pendingEmail
         || '';
+
+      // Clear the pending email after use
+      if (pendingEmail) {
+        sessionStorage.removeItem('pending_auth_email');
+      }
 
       // Extract name from various possible locations
       const givenName = auth0User.given_name
@@ -65,8 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const familyName = auth0User.family_name
         || auth0User['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname']
         || '';
-      const fullName = auth0User.name
-        || (givenName && familyName ? `${givenName} ${familyName}` : '')
+      const fullName = auth0User.name && auth0User.name.trim()
+        ? auth0User.name
+        : (givenName && familyName ? `${givenName} ${familyName}` : '')
         || email?.split('@')[0]
         || 'User';
 
@@ -74,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Determine auth provider based on connection
       const isSamlUser = auth0User.sub?.startsWith('samlp|') || auth0User.sub?.includes('Stanford-saml');
+      const isStanfordUser = auth0User.sub?.includes('Stanford-saml') || email?.endsWith('@stanford.edu');
       const authProvider = isSamlUser ? 'stanford-saml' : 'auth0';
 
       // For now, create a mock user profile from Auth0 data
@@ -91,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         totalRatings: 0,
         swapCount: 0,
         successfulSwaps: 0,
-        badges: isSamlUser ? ['verified-student', 'stanford'] : ['verified-student'],
+        badges: isStanfordUser ? ['verified-student', 'stanford'] : ['verified-student'],
         swapStreak: 0,
         averageResponseTime: 0,
         responseRate: 0,

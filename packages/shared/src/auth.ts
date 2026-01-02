@@ -26,6 +26,8 @@ export type Campus = {
 
 export type TrustBadge =
   | 'verified-student'
+  | 'stanford'              // Stanford verified via SAML
+  | 'berkeley'              // Berkeley verified via SAML
   | 'reliable-swapper'      // 10+ successful swaps
   | 'quick-responder'       // avg response < 2 hours
   | 'campus-og'             // active for 1+ year
@@ -53,7 +55,7 @@ export type UserProfile = {
   bio?: string;
 
   // Authentication
-  authProvider: 'google' | 'email' | 'auth0';
+  authProvider: 'google' | 'email' | 'auth0' | 'stanford-saml' | 'berkeley-saml';
   lastLogin: Date;
   createdAt: Date;
 
