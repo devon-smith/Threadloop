@@ -4,27 +4,18 @@ export function Login() {
   const { loginWithRedirect, isLoading } = useAuth0();
 
   const handleStanfordLogin = () => {
-    alert('STANFORD BUTTON CLICKED');
-    // Direct URL construction to bypass Universal Login and go straight to SAML
-    const domain = import.meta.env.VITE_AUTH0_DOMAIN || 'dev-voe0iav0bx1n8qkd.us.auth0.com';
-    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID || 'ec2LAdO4LsXxvGV0cefThYKCIizeS512';
-    const redirectUri = window.location.origin + '/callback';
-    const connection = 'Stanford-saml';
-
-    const authUrl = `https://${domain}/authorize?` +
-      `response_type=code&` +
-      `client_id=${clientId}&` +
-      `connection=${connection}&` +
-      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=openid%20profile%20email`;
-
-    console.log('STANFORD SAML URL:', authUrl);
-    window.location.href = authUrl;
+    // Use Auth0 SDK with connection parameter to go directly to Stanford SAML
+    loginWithRedirect({
+      authorizationParams: {
+        connection: 'Stanford-saml',
+        redirect_uri: window.location.origin + '/callback',
+      }
+    }).catch(err => {
+      console.error('Stanford SAML login error:', err);
+    });
   };
 
   const handleUniversalLogin = () => {
-    alert('UNIVERSAL BUTTON CLICKED');
-    console.log('UNIVERSAL LOGIN - no connection specified');
     loginWithRedirect({
       authorizationParams: {
         redirect_uri: window.location.origin + '/callback',
@@ -77,7 +68,7 @@ export function Login() {
               border: '2px solid #5d3bff'
             }}
           >
-            {isLoading ? 'Loading...' : 'Sign in with Stanford SAML (Debug)'}
+            {isLoading ? 'Loading...' : 'Sign in with Stanford'}
           </button>
 
           <p className="login-footer">
