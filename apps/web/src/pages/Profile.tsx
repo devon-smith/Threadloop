@@ -1,4 +1,5 @@
 import { useAuth } from '../context/AuthContext';
+import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 
 const BADGE_INFO: Record<string, { label: string; icon: string; description: string }> = {
@@ -36,6 +37,7 @@ const BADGE_INFO: Record<string, { label: string; icon: string; description: str
 
 export function Profile() {
   const { user, campus, logout, isLoading } = useAuth();
+  const { logout: auth0Logout } = useAuth0();
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -65,7 +67,11 @@ export function Profile() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    auth0Logout({
+      logoutParams: {
+        returnTo: window.location.origin + '/login'
+      }
+    });
   };
 
   return (
