@@ -1,10 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import type { UserProfile as ExtendedUserProfile, Campus } from '@threadloop/shared';
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
+import { supabase, DbUser, DbCampus } from '../lib/supabase';
 
 type AuthContextType = {
   user: ExtendedUserProfile | null;
@@ -82,27 +79,155 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log('Extracted user info:', { email, givenName, familyName, fullName });
 
-      // Determine auth provider based on connection
+      // Determine auth provider and campus based on email domain
       const isSamlUser = auth0User.sub?.startsWith('samlp|') || auth0User.sub?.includes('Stanford-saml');
       const isStanfordUser = auth0User.sub?.includes('Stanford-saml') || email?.endsWith('@stanford.edu');
+      const isBerkeleyUser = email?.endsWith('@berkeley.edu');
       const authProvider = isSamlUser ? 'stanford-saml' : 'auth0';
 
-      // For now, create a mock user profile from Auth0 data
-      // TODO: Replace with actual backend API call
-      const mockUser: ExtendedUserProfile = {
+      // Determine campus ID based on email domain
+      let campusId = '22222222-2222-2222-2222-222222222222'; // Default to Stanford
+      if (isBerkeleyUser) {
+        campusId = '33333333-3333-3333-3333-333333333333';
+      }
+
+      // Determine badges
+      const badges: string[] = ['verified-student'];
+      if (isStanfordUser) badges.push('stanford');
+      if (isBerkeleyUser) badges.push('berkeley');
+
+      // Try to get existing user from Supabase
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth0_id', auth0User.sub)
+        .single();
+
+      let dbUser: DbUser;
+
+      if (fetchError && fetchError.code === 'PGRST116') {
+        // User doesn't exist, create new user
+        console.log('Creating new user in Supabase...');
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            auth0_id: auth0User.sub,
+            email: email,
+            email_verified: auth0User.email_verified || isSamlUser,
+            campus_id: campusId,
+            display_name: fullName,
+            avatar_url: auth0User.picture || null,
+            auth_provider: authProvider,
+            badges: badges,
+            last_login: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error creating user:', insertError);
+          throw insertError;
+        }
+        dbUser = newUser;
+        console.log('New user created:', dbUser);
+      } else if (fetchError) {
+        console.error('Error fetching user:', fetchError);
+        throw fetchError;
+      } else {
+        // User exists, update last login
+        console.log('Existing user found, updating last login...');
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({
+            last_login: new Date().toISOString(),
+            // Update email if it changed (e.g., from SAML)
+            ...(email && email !== existingUser.email ? { email } : {}),
+          })
+          .eq('id', existingUser.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('Error updating user:', updateError);
+          throw updateError;
+        }
+        dbUser = updatedUser;
+      }
+
+      // Get campus data from Supabase
+      const { data: campusData, error: campusError } = await supabase
+        .from('campuses')
+        .select('*')
+        .eq('id', dbUser.campus_id)
+        .single();
+
+      if (campusError) {
+        console.error('Error fetching campus:', campusError);
+      }
+
+      // Convert DB user to app user format
+      const appUser: ExtendedUserProfile = {
+        id: dbUser.id,
+        email: dbUser.email,
+        emailVerified: dbUser.email_verified,
+        campusId: dbUser.campus_id || '',
+        displayName: dbUser.display_name,
+        avatarUrl: dbUser.avatar_url || undefined,
+        bio: dbUser.bio || undefined,
+        authProvider: dbUser.auth_provider as any,
+        lastLogin: new Date(dbUser.last_login),
+        createdAt: new Date(dbUser.created_at),
+        rating: Number(dbUser.rating) || 0,
+        totalRatings: dbUser.total_ratings,
+        swapCount: dbUser.swap_count,
+        successfulSwaps: dbUser.successful_swaps,
+        badges: dbUser.badges as any[],
+        swapStreak: dbUser.swap_streak,
+        averageResponseTime: dbUser.average_response_time,
+        responseRate: Number(dbUser.response_rate) || 0,
+        styleVibes: dbUser.style_vibes as any[],
+        favoriteColors: dbUser.favorite_colors,
+        sizingProfile: dbUser.sizing_profile || {},
+        settings: dbUser.settings as any || {
+          showProfile: true,
+          allowMessages: true,
+          shareStylePreferences: true,
+          emailNotifications: true,
+          pushNotifications: true
+        }
+      };
+
+      setUser(appUser);
+
+      // Convert DB campus to app campus format
+      if (campusData) {
+        const appCampus: Campus = {
+          id: campusData.id,
+          name: campusData.name,
+          emailDomains: campusData.email_domains,
+          location: campusData.location,
+          lockerLocations: campusData.locker_locations || [],
+          safeZones: campusData.safe_zones || []
+        };
+        setCampus(appCampus);
+      }
+    } catch (error) {
+      console.error('Failed to sync user to backend:', error);
+      // Fallback to basic user info if Supabase fails
+      const fallbackUser: ExtendedUserProfile = {
         id: auth0User.sub || '',
-        email: email,
-        emailVerified: auth0User.email_verified || isSamlUser, // SAML users are verified by their IdP
-        campusId: '22222222-2222-2222-2222-222222222222', // Default to Stanford
-        displayName: fullName,
-        authProvider: authProvider,
+        email: auth0User.email || '',
+        emailVerified: false,
+        campusId: '',
+        displayName: auth0User.name || 'User',
+        authProvider: 'auth0',
         lastLogin: new Date(),
         createdAt: new Date(),
         rating: 0,
         totalRatings: 0,
         swapCount: 0,
         successfulSwaps: 0,
-        badges: isStanfordUser ? ['verified-student', 'stanford'] : ['verified-student'],
+        badges: ['verified-student'],
         swapStreak: 0,
         averageResponseTime: 0,
         responseRate: 0,
@@ -117,26 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           pushNotifications: true
         }
       };
-
-      setUser(mockUser);
-
-      // Mock campus data - TODO: Get from backend based on email domain
-      const mockCampus: Campus = {
-        id: '22222222-2222-2222-2222-222222222222',
-        name: 'Stanford University',
-        emailDomains: ['stanford.edu'],
-        location: {
-          city: 'Stanford',
-          state: 'CA',
-          coordinates: { lat: 37.4275, lng: -122.1697 }
-        },
-        lockerLocations: [],
-        safeZones: []
-      };
-
-      setCampus(mockCampus);
-    } catch (error) {
-      console.error('Failed to sync user to backend:', error);
+      setUser(fallbackUser);
     } finally {
       setIsLoading(false);
     }
@@ -157,18 +263,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     // Update local state immediately
-    setUser({
+    const updatedUser = {
       ...user,
       styleVibes: profile.styleVibes as any,
       favoriteColors: profile.favoriteColors,
       sizingProfile: profile.sizingProfile || {}
-    });
+    };
+    setUser(updatedUser);
 
     // Mark quiz as completed
     localStorage.setItem('completed_style_quiz', 'true');
 
-    // TODO: Send to backend/Supabase
-    console.log('Style profile updated:', profile);
+    // Save to Supabase
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          style_vibes: profile.styleVibes,
+          favorite_colors: profile.favoriteColors,
+          sizing_profile: profile.sizingProfile || {},
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving style profile to Supabase:', error);
+      } else {
+        console.log('Style profile saved to Supabase');
+      }
+    } catch (error) {
+      console.error('Failed to save style profile:', error);
+    }
   };
 
   const updateProfile = async (updates: { displayName?: string; bio?: string; avatarUrl?: string }) => {
@@ -180,8 +304,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...updates
     });
 
-    // TODO: Send to backend/Supabase
-    console.log('Profile updated:', updates);
+    // Save to Supabase
+    try {
+      const dbUpdates: Record<string, any> = {};
+      if (updates.displayName !== undefined) dbUpdates.display_name = updates.displayName;
+      if (updates.bio !== undefined) dbUpdates.bio = updates.bio;
+      if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
+
+      const { error } = await supabase
+        .from('users')
+        .update(dbUpdates)
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error saving profile to Supabase:', error);
+      } else {
+        console.log('Profile saved to Supabase');
+      }
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+    }
   };
 
   return (
