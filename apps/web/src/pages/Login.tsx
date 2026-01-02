@@ -3,20 +3,22 @@ import { useAuth0 } from '@auth0/auth0-react';
 export function Login() {
   const { loginWithRedirect, isLoading } = useAuth0();
 
-  // Try different connection name variations
   const handleStanfordLogin = () => {
-    console.log('Attempting Stanford SAML login with connection: stanford-saml');
+    // Direct URL construction to bypass Universal Login and go straight to SAML
+    const domain = import.meta.env.VITE_AUTH0_DOMAIN || 'dev-voe0iav0bx1n8qkd.us.auth0.com';
+    const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID || 'ec2LAdO4LsXxvGV0cefThYKCIizeS512';
+    const redirectUri = window.location.origin + '/callback';
+    const connection = 'Stanford-saml';
 
-    // Try without specifying connection to see what options Auth0 shows
-    loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: window.location.origin + '/callback',
-        // Temporarily commenting out connection to see all options
-        // connection: 'stanford-saml',
-      }
-    }).catch(err => {
-      console.error('Stanford SAML login error:', err);
-    });
+    const authUrl = `https://${domain}/authorize?` +
+      `response_type=code&` +
+      `client_id=${clientId}&` +
+      `connection=${connection}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `scope=openid%20profile%20email`;
+
+    console.log('Redirecting to SAML:', authUrl);
+    window.location.href = authUrl;
   };
 
   const handleUniversalLogin = () => {
