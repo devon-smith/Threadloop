@@ -8,6 +8,16 @@ const BADGE_INFO: Record<string, { label: string; icon: string; description: str
     icon: '✓',
     description: 'University email verified'
   },
+  'stanford': {
+    label: 'Stanford Verified',
+    icon: '🌲',
+    description: 'Verified via Stanford SSO'
+  },
+  'berkeley': {
+    label: 'Berkeley Verified',
+    icon: '🐻',
+    description: 'Verified via Berkeley SSO'
+  },
   'reliable-swapper': {
     label: 'Reliable Swapper',
     icon: '🤝',
@@ -124,6 +134,7 @@ export function Profile() {
             <div className="badges-grid">
               {user.badges.map(badge => {
                 const info = BADGE_INFO[badge];
+                if (!info) return null; // Skip unknown badges
                 return (
                   <div key={badge} className="badge-card">
                     <span className="badge-icon">{info.icon}</span>
