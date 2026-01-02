@@ -38,8 +38,8 @@ export function Navigation() {
             </Link>
           </li>
           <li>
-            <Link to="/account" className={isActive('/account') ? 'active' : ''}>
-              Account
+            <Link to="/messages" className={isActive('/messages') ? 'active' : ''}>
+              Messages
             </Link>
           </li>
           {user ? (

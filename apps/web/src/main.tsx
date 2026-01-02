@@ -12,6 +12,7 @@ import { Login } from './pages/Login';
 import { StyleQuiz } from './pages/StyleQuiz';
 import { Profile } from './pages/Profile';
 import { Callback } from './pages/Callback';
+import { Messages } from './pages/Messages';
 import './styles.css';
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
               <Route path="/closet" element={<Closet />} />
               <Route path="/bulk-upload" element={<BulkUpload />} />
               <Route path="/account" element={<Account />} />
+              <Route path="/messages" element={<Messages />} />
               <Route path="/login" element={<Login />} />
               <Route path="/callback" element={<Callback />} />
               <Route path="/style-quiz" element={<StyleQuiz />} />
