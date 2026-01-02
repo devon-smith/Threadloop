@@ -4,19 +4,25 @@ export function Login() {
   const { loginWithRedirect, isLoading } = useAuth0();
 
   const handleStanfordLogin = () => {
+    console.log('Attempting Stanford SAML login...');
     loginWithRedirect({
       authorizationParams: {
         connection: 'stanford-saml',
         redirect_uri: window.location.origin + '/callback',
       }
+    }).catch(err => {
+      console.error('Stanford SAML login error:', err);
     });
   };
 
   const handleUniversalLogin = () => {
+    console.log('Attempting Universal Login...');
     loginWithRedirect({
       authorizationParams: {
         redirect_uri: window.location.origin + '/callback',
       }
+    }).catch(err => {
+      console.error('Universal login error:', err);
     });
   };
 
@@ -45,16 +51,16 @@ export function Login() {
           </div>
 
           <button
-            onClick={handleStanfordLogin}
+            onClick={handleUniversalLogin}
             className="login-button"
             disabled={isLoading}
             style={{ marginBottom: '12px' }}
           >
-            {isLoading ? 'Loading...' : 'Sign in with Stanford'}
+            {isLoading ? 'Loading...' : 'Sign in with University Email'}
           </button>
 
           <button
-            onClick={handleUniversalLogin}
+            onClick={handleStanfordLogin}
             className="login-button"
             disabled={isLoading}
             style={{
@@ -63,7 +69,7 @@ export function Login() {
               border: '2px solid #5d3bff'
             }}
           >
-            {isLoading ? 'Loading...' : 'Sign in with Other University'}
+            {isLoading ? 'Loading...' : 'Sign in with Stanford SAML (Debug)'}
           </button>
 
           <p className="login-footer">
