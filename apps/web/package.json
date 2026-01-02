@@ -11,8 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@auth0/auth0-react": "^2.11.0",
+    "@supabase/supabase-js": "^2.89.0",
     "@threadloop/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.45.4",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-router-dom": "^7.10.1"

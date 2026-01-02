@@ -1,26 +1,23 @@
-import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth0 } from '@auth0/auth0-react';
 
 export function Login() {
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { loginWithRedirect, isLoading } = useAuth0();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const handleStanfordLogin = () => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection: 'stanford-saml',
+        redirect_uri: window.location.origin + '/callback',
+      }
+    });
+  };
 
-    const result = await login(email);
-
-    if (result.success) {
-      return;
-    } else {
-      setError(result.error || 'Login failed');
-    }
-
-    setLoading(false);
+  const handleUniversalLogin = () => {
+    loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: window.location.origin + '/callback',
+      }
+    });
   };
 
   return (
@@ -28,10 +25,10 @@ export function Login() {
       <div className="login-card">
         <div className="login-header">
           <h1>Welcome to ThreadLoop</h1>
-          <p className="login-subtitle">Sign in with your university email to get started</p>
+          <p className="login-subtitle">Sign in with your university credentials</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
+        <div className="login-form">
           <div className="login-benefits">
             <div className="benefit-item">
               <span className="benefit-icon">✓</span>
@@ -47,39 +44,32 @@ export function Login() {
             </div>
           </div>
 
-          <label className="field">
-            <span>University Email</span>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your.name@stanford.edu"
-              required
-              disabled={loading}
-            />
-            <small className="hint">
-              Use your .edu email address (Stanford, UC Berkeley, MIT supported)
-            </small>
-          </label>
-
-          {error && (
-            <div className="error-message">
-              {error}
-            </div>
-          )}
+          <button
+            onClick={handleStanfordLogin}
+            className="login-button"
+            disabled={isLoading}
+            style={{ marginBottom: '12px' }}
+          >
+            {isLoading ? 'Loading...' : 'Sign in with Stanford'}
+          </button>
 
           <button
-            type="submit"
-            className="cta-primary login-button"
-            disabled={loading}
+            onClick={handleUniversalLogin}
+            className="login-button"
+            disabled={isLoading}
+            style={{
+              background: 'white',
+              color: '#5d3bff',
+              border: '2px solid #5d3bff'
+            }}
           >
-            {loading ? 'Signing in...' : 'Sign in with University Email'}
+            {isLoading ? 'Loading...' : 'Sign in with Other University'}
           </button>
 
           <p className="login-footer">
             By signing in, you agree to our Terms of Service and verify you are a current student.
           </p>
-        </form>
+        </div>
 
         <div className="supported-universities">
           <p className="supported-title">Supported Universities:</p>
