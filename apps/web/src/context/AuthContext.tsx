@@ -48,27 +48,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const syncUserToBackend = async (auth0User: any) => {
     try {
-      console.log('Auth0 user:', auth0User);
+      console.log('Auth0 user data:', JSON.stringify(auth0User, null, 2));
 
-      // Create or update user in backend (will eventually be Supabase)
-      const email = auth0User.email;
+      // Extract email from various possible locations in Auth0/SAML response
+      // Stanford SAML may put email in different fields
+      const email = auth0User.email
+        || auth0User['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress']
+        || auth0User.preferred_username
+        || auth0User.upn
+        || '';
+
+      // Extract name from various possible locations
+      const givenName = auth0User.given_name
+        || auth0User['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname']
+        || '';
+      const familyName = auth0User.family_name
+        || auth0User['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname']
+        || '';
+      const fullName = auth0User.name
+        || (givenName && familyName ? `${givenName} ${familyName}` : '')
+        || email?.split('@')[0]
+        || 'User';
+
+      console.log('Extracted user info:', { email, givenName, familyName, fullName });
+
+      // Determine auth provider based on connection
+      const isSamlUser = auth0User.sub?.startsWith('samlp|') || auth0User.sub?.includes('Stanford-saml');
+      const authProvider = isSamlUser ? 'stanford-saml' : 'auth0';
 
       // For now, create a mock user profile from Auth0 data
       // TODO: Replace with actual backend API call
       const mockUser: ExtendedUserProfile = {
         id: auth0User.sub || '',
-        email: email || '',
-        emailVerified: auth0User.email_verified || false,
+        email: email,
+        emailVerified: auth0User.email_verified || isSamlUser, // SAML users are verified by their IdP
         campusId: '22222222-2222-2222-2222-222222222222', // Default to Stanford
-        displayName: auth0User.name || email?.split('@')[0] || 'User',
-        authProvider: 'auth0',
+        displayName: fullName,
+        authProvider: authProvider,
         lastLogin: new Date(),
         createdAt: new Date(),
         rating: 0,
         totalRatings: 0,
         swapCount: 0,
         successfulSwaps: 0,
-        badges: ['verified-student'],
+        badges: isSamlUser ? ['verified-student', 'stanford'] : ['verified-student'],
         swapStreak: 0,
         averageResponseTime: 0,
         responseRate: 0,
