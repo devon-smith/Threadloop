@@ -22,6 +22,8 @@ function App() {
       authorizationParams={{
         redirect_uri: typeof window !== 'undefined' ? window.location.origin + '/callback' : '',
       }}
+      useRefreshTokens={false}
+      cacheLocation="localstorage"
     >
       <BrowserRouter>
         <AuthProvider>
