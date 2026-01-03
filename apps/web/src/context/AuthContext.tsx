@@ -96,12 +96,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isStanfordUser) badges.push('stanford');
       if (isBerkeleyUser) badges.push('berkeley');
 
-      // Try to get existing user from Supabase
-      const { data: existingUser, error: fetchError } = await supabase
+      // Try to get existing user from Supabase - first by auth0_id, then by email
+      let { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('auth0_id', auth0User.sub)
         .maybeSingle();
+
+      // If not found by auth0_id, try finding by email (handles auth0_id format changes)
+      if (!existingUser && email) {
+        const { data: userByEmail, error: emailFetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', email)
+          .maybeSingle();
+
+        if (userByEmail && !emailFetchError) {
+          console.log('Found existing user by email, updating auth0_id...');
+          existingUser = userByEmail;
+          // Update the auth0_id to the new format
+          await supabase
+            .from('users')
+            .update({ auth0_id: auth0User.sub })
+            .eq('id', userByEmail.id);
+        }
+      }
 
       let dbUser: DbUser;
 
@@ -140,8 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .from('users')
           .update({
             last_login: new Date().toISOString(),
-            // Update email if it changed (e.g., from SAML)
-            ...(email && email !== existingUser.email ? { email } : {}),
+            // Update auth0_id if it changed
+            auth0_id: auth0User.sub,
           })
           .eq('id', existingUser.id)
           .select()
