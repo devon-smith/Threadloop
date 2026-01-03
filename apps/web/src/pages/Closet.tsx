@@ -4,40 +4,22 @@ import type { Listing } from '@threadloop/shared';
 import { useAuth } from '../context/AuthContext';
 import { fetchMyListings, createListing, updateListingStatus } from '../lib/listings';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
+// Common clothing categories
+const CATEGORIES = [
+  'Tops',
+  'Bottoms',
+  'Dresses',
+  'Outerwear',
+  'Shoes',
+  'Accessories',
+  'Activewear',
+  'Formal',
+  'Vintage',
+  'Other'
+];
 
-type AiSuggestion = {
-  title: string;
-  description: string;
-  category: string;
-  size: string;
-  condition: Listing['condition'];
-  price?: number;
-  swapValue?: number;
-  aiMetadata?: Record<string, unknown>;
-};
-
-function formatAiMetadata(metadata?: Record<string, unknown>): string {
-  if (!metadata) return '';
-
-  return Object.entries(metadata)
-    .flatMap(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map((entry) => String(entry));
-      }
-      if (typeof value === 'object' && value !== null) {
-        return Object.values(value as Record<string, unknown>).map((entry) => String(entry));
-      }
-      if (typeof value === 'boolean') {
-        return value ? [key] : [];
-      }
-      return [String(value)];
-    })
-    .filter(Boolean)
-    .join(', ');
-}
+// Common sizes
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
 
 function ListingCard({
   listing,
@@ -95,18 +77,20 @@ function ListingCard({
 function NewListingForm({
   userId,
   campusId,
-  onCreated
+  onCreated,
+  onCancel
 }: {
   userId: string;
   campusId: string;
   onCreated: (listing: Listing) => void;
+  onCancel: () => void;
 }) {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    category: '',
-    size: '',
-    condition: 'like_new',
+    category: 'Tops',
+    size: 'M',
+    condition: 'like_new' as const,
     price: '',
     swapValue: '',
     imageUrl: ''
@@ -114,8 +98,6 @@ function NewListingForm({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [imageData, setImageData] = useState<string | null>(null);
-  const [aiMetadata, setAiMetadata] = useState<Record<string, unknown> | undefined>();
-  const [autoFillLoading, setAutoFillLoading] = useState(false);
 
   const handleChange = (field: keyof typeof form) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -130,58 +112,35 @@ function NewListingForm({
       return;
     }
 
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage('Image must be less than 5MB');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
         setImageData(reader.result);
+        setMessage(null);
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const handleAutoFill = async () => {
-    if (!imageData && !form.imageUrl) {
-      setMessage('Add an image before requesting AI suggestions.');
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!form.title.trim()) {
+      setMessage('Please enter a title');
       return;
     }
 
-    setAutoFillLoading(true);
-    setMessage(null);
-    try {
-      const response = await fetch(`${API_BASE_URL}/ai/listing-suggestions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageData: imageData ?? undefined,
-          imageUrl: imageData ? undefined : form.imageUrl || undefined
-        })
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload.success) {
-        throw new Error(payload.error ?? 'AI assistant failed.');
-      }
-      const suggestion: AiSuggestion = payload.data;
-      setForm((prev) => ({
-        ...prev,
-        title: suggestion.title,
-        description: suggestion.description,
-        category: suggestion.category,
-        size: suggestion.size,
-        condition: suggestion.condition,
-        price: suggestion.price ? String(suggestion.price) : '',
-        swapValue: suggestion.swapValue ? String(suggestion.swapValue) : prev.swapValue
-      }));
-      setAiMetadata(suggestion.aiMetadata);
-      setMessage('AI filled in the details. Adjust anything before publishing.');
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Could not auto-fill.');
-    } finally {
-      setAutoFillLoading(false);
+    if (!imageData && !form.imageUrl) {
+      setMessage('Please add an image');
+      return;
     }
-  };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
     setSubmitting(true);
     setMessage(null);
 
@@ -189,39 +148,22 @@ function NewListingForm({
       const listing = await createListing({
         sellerId: userId,
         campusId: campusId,
-        title: form.title || 'Untitled listing',
-        description: form.description || 'Listed via ThreadLoop.',
-        category: form.category || 'General',
-        size: form.size || 'M',
-        condition: form.condition as Listing['condition'],
+        title: form.title.trim(),
+        description: form.description.trim() || 'No description provided.',
+        category: form.category,
+        size: form.size,
+        condition: form.condition,
         price: form.price ? Number(form.price) : undefined,
         swapValue: form.swapValue ? Number(form.swapValue) : undefined,
-        aiMetadata,
         images: [
           {
-            storageUrl:
-              imageData ||
-              form.imageUrl ||
-              'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80'
+            storageUrl: imageData || form.imageUrl
           }
         ]
       });
 
       if (listing) {
         onCreated(listing);
-        setForm({
-          title: '',
-          description: '',
-          category: '',
-          size: '',
-          condition: 'like_new',
-          price: '',
-          swapValue: '',
-          imageUrl: ''
-        });
-        setImageData(null);
-        setAiMetadata(undefined);
-        setMessage('Listing published successfully!');
       } else {
         throw new Error('Failed to create listing');
       }
@@ -232,105 +174,155 @@ function NewListingForm({
     }
   };
 
+  const imagePreview = imageData || form.imageUrl;
+
   return (
-    <form className="form-card" onSubmit={handleSubmit}>
-      <div className="form-grid">
-        <label className="field">
-          <span>Title</span>
+    <form className="listing-form" onSubmit={handleSubmit}>
+      {/* Image Upload Section */}
+      <div className="image-upload-section">
+        <div
+          className={`image-drop-zone ${imagePreview ? 'has-image' : ''}`}
+          onClick={() => document.getElementById('image-input')?.click()}
+        >
+          {imagePreview ? (
+            <img src={imagePreview} alt="Preview" className="image-preview-large" />
+          ) : (
+            <div className="upload-placeholder">
+              <span className="upload-icon">📷</span>
+              <span>Click to upload photo</span>
+              <span className="upload-hint">or drag and drop</span>
+            </div>
+          )}
           <input
+            id="image-input"
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden-input"
+          />
+        </div>
+        {imagePreview && (
+          <button
+            type="button"
+            className="change-image-btn"
+            onClick={() => {
+              setImageData(null);
+              setForm(prev => ({ ...prev, imageUrl: '' }));
+            }}
+          >
+            Remove image
+          </button>
+        )}
+      </div>
+
+      {/* Form Fields */}
+      <div className="form-fields">
+        <div className="field">
+          <label htmlFor="title">Title *</label>
+          <input
+            id="title"
             value={form.title}
             onChange={handleChange('title')}
-            placeholder="e.g. Brown leather blazer"
+            placeholder="What are you selling?"
             required
           />
-        </label>
-        <label className="field">
-          <span>Category</span>
-          <input
-            value={form.category}
-            onChange={handleChange('category')}
-            placeholder="Outerwear"
-          />
-        </label>
-        <label className="field">
-          <span>Size</span>
-          <input
-            value={form.size}
-            onChange={handleChange('size')}
-            placeholder="M"
-          />
-        </label>
-        <label className="field">
-          <span>Condition</span>
-          <select value={form.condition} onChange={handleChange('condition') as any}>
-            <option value="new">New</option>
-            <option value="like_new">Like new</option>
-            <option value="good">Good</option>
-            <option value="fair">Fair</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Price (optional)</span>
-          <input
-            type="number"
-            value={form.price}
-            onChange={handleChange('price')}
-            min="0"
-            step="1"
-          />
-        </label>
-        <label className="field">
-          <span>Swap value</span>
-          <input
-            type="number"
-            value={form.swapValue}
-            onChange={handleChange('swapValue')}
-            min="0"
-            step="1"
-          />
-        </label>
-        <label className="field field-full">
-          <span>Description</span>
+        </div>
+
+        <div className="form-row">
+          <div className="field">
+            <label htmlFor="category">Category</label>
+            <select id="category" value={form.category} onChange={handleChange('category')}>
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor="size">Size</label>
+            <select id="size" value={form.size} onChange={handleChange('size')}>
+              {SIZES.map(size => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor="condition">Condition</label>
+            <select id="condition" value={form.condition} onChange={handleChange('condition')}>
+              <option value="new">New with tags</option>
+              <option value="like_new">Like new</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="field">
+            <label htmlFor="price">Price ($)</label>
+            <input
+              id="price"
+              type="number"
+              value={form.price}
+              onChange={handleChange('price')}
+              min="0"
+              step="1"
+              placeholder="0"
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="swapValue">Swap Value ($)</label>
+            <input
+              id="swapValue"
+              type="number"
+              value={form.swapValue}
+              onChange={handleChange('swapValue')}
+              min="0"
+              step="1"
+              placeholder="0"
+            />
+            <span className="field-hint">Estimated value for swaps</span>
+          </div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="description">Description</label>
           <textarea
+            id="description"
             value={form.description}
             onChange={handleChange('description')}
             rows={3}
-            placeholder="Texture, fit, campus meet-up preferences..."
+            placeholder="Describe the item, its condition, and any meetup preferences..."
           />
-        </label>
-        <label className="field field-full">
-          <span>Image URL</span>
+        </div>
+
+        <div className="field">
+          <label htmlFor="imageUrl">Or paste image URL</label>
           <input
+            id="imageUrl"
             value={form.imageUrl}
             onChange={handleChange('imageUrl')}
             placeholder="https://..."
+            disabled={!!imageData}
           />
-          <small className="hint">Use any hosted photo or upload a quick mirror pic.</small>
-        </label>
-        <label className="field field-full">
-          <span>Upload image</span>
-          <input type="file" accept="image/*" onChange={handleImageUpload} />
-          {imageData && <img className="preview" src={imageData} alt="Preview" />}
-        </label>
+        </div>
       </div>
-      <div className="actions actions-alt">
-        <button
-          type="button"
-          className="ghost"
-          onClick={handleAutoFill}
-          disabled={autoFillLoading}
-        >
-          {autoFillLoading ? 'Letting AI think…' : 'Use AI to auto-fill'}
+
+      {message && (
+        <div className={`form-message ${message.includes('success') ? 'success' : 'error'}`}>
+          {message}
+        </div>
+      )}
+
+      <div className="form-actions">
+        <button type="button" className="btn-secondary" onClick={onCancel}>
+          Cancel
         </button>
-        {aiMetadata && (
-          <span className="ai-tags">AI tags: {formatAiMetadata(aiMetadata)}</span>
-        )}
-      </div>
-      <div className="actions">
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Publishing…' : 'Publish listing'}
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Publishing...' : 'Publish Listing'}
         </button>
-        {message && <span className="status-message">{message}</span>}
       </div>
     </form>
   );
@@ -345,12 +337,11 @@ function ListingModal({
 }) {
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal listing-modal" onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose} aria-label="Close form">
           ×
         </button>
-        <h2>Add New Listing</h2>
-        <p className="modal-subtitle">Upload a photo and let AI fill in the rest.</p>
+        <h2>Create Listing</h2>
         {children}
       </div>
     </div>
@@ -431,10 +422,14 @@ export function Closet() {
           {loading ? (
             <p className="loading-state">Loading your listings...</p>
           ) : activeListings.length === 0 ? (
-            <p className="empty-state">
-              You haven't listed any items yet. Click "Add Listing" to upload something
-              from your wardrobe!
-            </p>
+            <div className="empty-closet">
+              <span className="empty-icon">👕</span>
+              <h3>Your closet is empty</h3>
+              <p>List items you want to sell or swap with other students</p>
+              <button className="cta-primary" onClick={() => setIsModalOpen(true)}>
+                Add Your First Listing
+              </button>
+            </div>
           ) : (
             <div className="grid">
               {activeListings.map((listing) => (
@@ -456,6 +451,7 @@ export function Closet() {
             userId={user.id}
             campusId={user.campusId || '22222222-2222-2222-2222-222222222222'}
             onCreated={handleNewListing}
+            onCancel={() => setIsModalOpen(false)}
           />
         </ListingModal>
       )}
