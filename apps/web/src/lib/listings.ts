@@ -1,4 +1,4 @@
-import { supabase, DbListing, DbListingImage } from './supabase';
+import { supabase, DbListing, DbListingImage, uploadBase64Image } from './supabase';
 import type { Listing, ListingImage } from '@threadloop/shared';
 
 // Convert DB listing to app format
@@ -162,21 +162,41 @@ export async function createListing(input: {
     return null;
   }
 
-  // Then add images
+  // Then add images - upload base64 to Supabase Storage if needed
   if (input.images.length > 0) {
-    const imageInserts = input.images.map((img, index) => ({
-      listing_id: listing.id,
-      storage_url: img.storageUrl,
-      position: index,
-      quality_score: img.qualityScore || null
-    }));
+    const imageInserts: { listing_id: string; storage_url: string; position: number; quality_score: number | null }[] = [];
 
-    const { error: imageError } = await supabase
-      .from('listing_images')
-      .insert(imageInserts);
+    for (let index = 0; index < input.images.length; index++) {
+      const img = input.images[index];
+      let storageUrl = img.storageUrl;
 
-    if (imageError) {
-      console.error('Error adding listing images:', imageError);
+      // If it's a base64 data URL, upload to Supabase Storage
+      if (storageUrl.startsWith('data:')) {
+        const uploadedUrl = await uploadBase64Image(storageUrl, listing.id);
+        if (uploadedUrl) {
+          storageUrl = uploadedUrl;
+        } else {
+          console.error('Failed to upload image to storage');
+          continue; // Skip this image if upload failed
+        }
+      }
+
+      imageInserts.push({
+        listing_id: listing.id,
+        storage_url: storageUrl,
+        position: index,
+        quality_score: img.qualityScore || null
+      });
+    }
+
+    if (imageInserts.length > 0) {
+      const { error: imageError } = await supabase
+        .from('listing_images')
+        .insert(imageInserts);
+
+      if (imageError) {
+        console.error('Error adding listing images:', imageError);
+      }
     }
   }
 

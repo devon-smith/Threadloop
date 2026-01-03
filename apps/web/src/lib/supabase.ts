@@ -143,3 +143,86 @@ export type DbFavorite = {
   listing_id: string;
   created_at: string;
 };
+
+// Upload image to Supabase Storage and return public URL
+export async function uploadListingImage(
+  file: File,
+  listingId: string
+): Promise<string | null> {
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `${listingId}/${Date.now()}.${fileExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('listing-images')
+    .upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (uploadError) {
+    console.error('Error uploading image:', uploadError);
+    return null;
+  }
+
+  const { data } = supabase.storage
+    .from('listing-images')
+    .getPublicUrl(fileName);
+
+  return data.publicUrl;
+}
+
+// Upload base64 image to Supabase Storage
+export async function uploadBase64Image(
+  base64Data: string,
+  listingId: string
+): Promise<string | null> {
+  // Extract the base64 content and mime type
+  const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+  if (!matches) {
+    console.error('Invalid base64 data format');
+    return null;
+  }
+
+  const mimeType = matches[1];
+  const base64Content = matches[2];
+
+  // Determine file extension from mime type
+  const extMap: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp'
+  };
+  const fileExt = extMap[mimeType] || 'jpg';
+
+  // Convert base64 to blob
+  const byteCharacters = atob(base64Content);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: mimeType });
+
+  const fileName = `${listingId}/${Date.now()}.${fileExt}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('listing-images')
+    .upload(fileName, blob, {
+      cacheControl: '3600',
+      contentType: mimeType,
+      upsert: false
+    });
+
+  if (uploadError) {
+    console.error('Error uploading image:', uploadError);
+    return null;
+  }
+
+  const { data } = supabase.storage
+    .from('listing-images')
+    .getPublicUrl(fileName);
+
+  return data.publicUrl;
+}
