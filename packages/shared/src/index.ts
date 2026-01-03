@@ -27,11 +27,14 @@ export interface Listing {
   category: string;
   size: string;
   condition: 'new' | 'like_new' | 'good' | 'fair';
+  brand?: string;
   price?: number;
   swapValue?: number;
-  status: 'active' | 'reserved' | 'completed' | 'cancelled';
+  status: 'active' | 'reserved' | 'sold' | 'swapped' | 'cancelled';
   aiMetadata?: Record<string, unknown>;
   images: ListingImage[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface SwapRequest {

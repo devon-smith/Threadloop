@@ -359,9 +359,10 @@ export function Closet() {
   useEffect(() => {
     if (!user) return;
 
+    const userId = user.id;
     async function loadMyListings() {
       setLoading(true);
-      const listings = await fetchMyListings(user.id);
+      const listings = await fetchMyListings(userId);
       setMyListings(listings);
       setLoading(false);
     }

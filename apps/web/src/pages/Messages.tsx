@@ -44,9 +44,10 @@ export function Messages() {
   useEffect(() => {
     if (!user) return;
 
+    const userId = user.id;
     async function loadConversations() {
       setLoading(true);
-      const data = await fetchConversations(user.id);
+      const data = await fetchConversations(userId);
       setConversations(data);
       setLoading(false);
     }
@@ -58,17 +59,20 @@ export function Messages() {
   useEffect(() => {
     if (!selectedConversation || !user) return;
 
+    const conversationId = selectedConversation;
+    const userId = user.id;
+
     async function loadMessages() {
-      const data = await fetchMessages(selectedConversation);
+      const data = await fetchMessages(conversationId);
       setMessages(data);
 
       // Mark messages as read
-      await markMessagesAsRead(selectedConversation, user.id);
+      await markMessagesAsRead(conversationId, userId);
 
       // Update unread count in conversations list
       setConversations(prev =>
         prev.map(c =>
-          c.id === selectedConversation ? { ...c, unreadCount: 0 } : c
+          c.id === conversationId ? { ...c, unreadCount: 0 } : c
         )
       );
     }
@@ -76,10 +80,10 @@ export function Messages() {
     loadMessages();
 
     // Subscribe to new messages
-    const unsubscribe = subscribeToMessages(selectedConversation, (newMsg) => {
+    const unsubscribe = subscribeToMessages(conversationId, (newMsg) => {
       setMessages(prev => [...prev, newMsg]);
-      if (newMsg.senderId !== user.id) {
-        markMessagesAsRead(selectedConversation, user.id);
+      if (newMsg.senderId !== userId) {
+        markMessagesAsRead(conversationId, userId);
       }
     });
 
