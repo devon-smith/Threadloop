@@ -101,11 +101,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('users')
         .select('*')
         .eq('auth0_id', auth0User.sub)
-        .single();
+        .maybeSingle();
 
       let dbUser: DbUser;
 
-      if (fetchError && fetchError.code === 'PGRST116') {
+      if (!existingUser && (!fetchError || fetchError.code === 'PGRST116')) {
         // User doesn't exist, create new user
         console.log('Creating new user in Supabase...');
         const { data: newUser, error: insertError } = await supabase
