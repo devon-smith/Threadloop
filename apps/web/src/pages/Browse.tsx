@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Listing } from '@threadloop/shared';
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
+import { fetchListings } from '../lib/listings';
+import { startConversation } from '../lib/messages';
+import { useAuth } from '../context/AuthContext';
 
 type FilterState = {
   category: string;
@@ -12,7 +11,22 @@ type FilterState = {
   priceMax: string;
 };
 
-function ListingCard({ listing }: { listing: Listing }) {
+type ListingWithSeller = Listing & {
+  seller?: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+    rating: number;
+  };
+};
+
+function ListingCard({
+  listing,
+  onClick
+}: {
+  listing: ListingWithSeller;
+  onClick: () => void;
+}) {
   const priceLabel = useMemo(() => {
     if (listing.price) {
       return `$${listing.price.toFixed(0)}`;
@@ -26,7 +40,7 @@ function ListingCard({ listing }: { listing: Listing }) {
   const coverImage = listing.images?.[0]?.storageUrl;
 
   return (
-    <article className="card">
+    <article className="card listing-card" onClick={onClick}>
       {coverImage && (
         <img className="card-image" src={coverImage} alt={listing.title} loading="lazy" />
       )}
@@ -36,15 +50,147 @@ function ListingCard({ listing }: { listing: Listing }) {
       </header>
       <h3>{listing.title}</h3>
       <p className="meta">Size {listing.size} • {priceLabel}</p>
-      <p className="description">{listing.description}</p>
+      {listing.seller && (
+        <div className="seller-preview">
+          <div className="seller-avatar-small">
+            {listing.seller.avatarUrl ? (
+              <img src={listing.seller.avatarUrl} alt={listing.seller.displayName} />
+            ) : (
+              listing.seller.displayName.charAt(0)
+            )}
+          </div>
+          <span className="seller-name">{listing.seller.displayName}</span>
+          {listing.seller.rating > 0 && (
+            <span className="seller-rating">★ {listing.seller.rating.toFixed(1)}</span>
+          )}
+        </div>
+      )}
     </article>
   );
 }
 
+function ListingDetailModal({
+  listing,
+  onClose,
+  onContactSeller
+}: {
+  listing: ListingWithSeller;
+  onClose: () => void;
+  onContactSeller: (message: string) => Promise<void>;
+}) {
+  const { user } = useAuth();
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const isOwnListing = user?.id === listing.sellerId;
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim() || sending) return;
+    setSending(true);
+    await onContactSeller(message);
+    setSending(false);
+    setSent(true);
+    setMessage('');
+  };
+
+  const priceLabel = listing.price
+    ? `$${listing.price.toFixed(0)}`
+    : listing.swapValue
+    ? `Swap value: $${listing.swapValue.toFixed(0)}`
+    : 'Open to offers';
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal listing-detail-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="close" onClick={onClose} aria-label="Close">×</button>
+
+        <div className="listing-detail-content">
+          <div className="listing-detail-images">
+            {listing.images?.[0]?.storageUrl ? (
+              <img src={listing.images[0].storageUrl} alt={listing.title} />
+            ) : (
+              <div className="no-image">No image</div>
+            )}
+          </div>
+
+          <div className="listing-detail-info">
+            <div className="listing-detail-header">
+              <span className="pill">{listing.condition.replace('_', ' ')}</span>
+              <span className="pill pill-secondary">{listing.category}</span>
+            </div>
+
+            <h2>{listing.title}</h2>
+            <p className="listing-price-large">{priceLabel}</p>
+            <p className="listing-size">Size: {listing.size}</p>
+
+            {listing.description && (
+              <p className="listing-description">{listing.description}</p>
+            )}
+
+            {listing.seller && (
+              <div className="seller-info-card">
+                <div className="seller-avatar">
+                  {listing.seller.avatarUrl ? (
+                    <img src={listing.seller.avatarUrl} alt={listing.seller.displayName} />
+                  ) : (
+                    listing.seller.displayName.charAt(0)
+                  )}
+                </div>
+                <div className="seller-details">
+                  <span className="seller-name">{listing.seller.displayName}</span>
+                  {listing.seller.rating > 0 && (
+                    <span className="seller-rating">★ {listing.seller.rating.toFixed(1)}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {user && !isOwnListing && !sent && (
+              <form className="contact-seller-form" onSubmit={handleSendMessage}>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder={`Hi! Is this ${listing.title} still available?`}
+                  rows={3}
+                />
+                <button type="submit" disabled={!message.trim() || sending}>
+                  {sending ? 'Sending...' : 'Message Seller'}
+                </button>
+              </form>
+            )}
+
+            {sent && (
+              <div className="message-sent-notice">
+                Message sent! Check your Messages tab for replies.
+              </div>
+            )}
+
+            {isOwnListing && (
+              <div className="own-listing-notice">
+                This is your listing
+              </div>
+            )}
+
+            {!user && (
+              <div className="login-prompt">
+                <a href="/login">Sign in</a> to message this seller
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Browse() {
-  const [listings, setListings] = useState<Listing[]>([]);
+  const { user } = useAuth();
+  const [listings, setListings] = useState<ListingWithSeller[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedListing, setSelectedListing] = useState<ListingWithSeller | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     category: '',
     size: '',
@@ -53,39 +199,18 @@ export function Browse() {
   });
 
   useEffect(() => {
-    async function fetchListings() {
+    async function loadListings() {
       try {
         setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/listings`);
-
-        const contentType = response.headers.get('content-type') ?? '';
-        const text = await response.text();
-
-        if (!contentType.includes('application/json')) {
-          throw new Error(
-            `Failed to load listings (HTTP ${response.status}). ${text ? text.slice(0, 200) : 'Non-JSON response.'}`
-          );
-        }
-
-        let payload: any;
-        try {
-          payload = text ? JSON.parse(text) : null;
-        } catch {
-          throw new Error(`Failed to parse listings response (HTTP ${response.status}).`);
-        }
-
-        if (!response.ok || !payload?.success) {
-          throw new Error(payload?.error ?? `Failed to load listings (HTTP ${response.status})`);
-        }
-
-        setListings(payload.data ?? []);
+        const data = await fetchListings();
+        setListings(data as ListingWithSeller[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unable to load listings');
       } finally {
         setLoading(false);
       }
     }
-    fetchListings();
+    loadListings();
   }, []);
 
   const filteredListings = useMemo(() => {
@@ -112,7 +237,9 @@ export function Browse() {
     return Array.from(szs).sort();
   }, [listings]);
 
-  const handleFilterChange = (field: keyof FilterState) => (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+  const handleFilterChange = (field: keyof FilterState) => (
+    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+  ) => {
     setFilters((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
@@ -120,12 +247,23 @@ export function Browse() {
     setFilters({ category: '', size: '', condition: '', priceMax: '' });
   };
 
+  const handleContactSeller = async (message: string) => {
+    if (!user || !selectedListing?.seller) return;
+
+    await startConversation(
+      selectedListing.id,
+      user.id,
+      selectedListing.seller.id,
+      message
+    );
+  };
+
   return (
     <div className="page-content">
       <section>
         <div className="section-header">
           <h1>Browse Listings</h1>
-          <span>{filteredListings.length} items available on your campus</span>
+          <span>{filteredListings.length} items available</span>
         </div>
 
         <div className="filters-bar">
@@ -183,18 +321,34 @@ export function Browse() {
           </div>
         </div>
 
-        {loading && <p>Loading listings...</p>}
+        {loading && <p className="loading-state">Loading listings...</p>}
         {error && <p className="error">{error}</p>}
 
         <div className="grid">
           {filteredListings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              onClick={() => setSelectedListing(listing)}
+            />
           ))}
           {!loading && filteredListings.length === 0 && !error && (
-            <p className="empty-state">No listings match your filters. Try adjusting them.</p>
+            <p className="empty-state">
+              {listings.length === 0
+                ? 'No listings yet. Be the first to add one!'
+                : 'No listings match your filters. Try adjusting them.'}
+            </p>
           )}
         </div>
       </section>
+
+      {selectedListing && (
+        <ListingDetailModal
+          listing={selectedListing}
+          onClose={() => setSelectedListing(null)}
+          onContactSeller={handleContactSeller}
+        />
+      )}
     </div>
   );
 }

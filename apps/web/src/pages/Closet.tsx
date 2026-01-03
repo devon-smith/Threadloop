@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Listing } from '@threadloop/shared';
+import { useAuth } from '../context/AuthContext';
+import { fetchMyListings, createListing, updateListingStatus } from '../lib/listings';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
-const DEFAULT_SELLER_ID = '11111111-1111-1111-1111-111111111111';
-const DEFAULT_CAMPUS_ID = '22222222-2222-2222-2222-222222222222';
 
 type AiSuggestion = {
   title: string;
@@ -38,7 +39,15 @@ function formatAiMetadata(metadata?: Record<string, unknown>): string {
     .join(', ');
 }
 
-function ListingCard({ listing, owned = false }: { listing: Listing; owned?: boolean }) {
+function ListingCard({
+  listing,
+  owned = false,
+  onStatusChange
+}: {
+  listing: Listing;
+  owned?: boolean;
+  onStatusChange?: (status: 'active' | 'cancelled') => void;
+}) {
   const priceLabel = useMemo(() => {
     if (listing.price) {
       return `$${listing.price.toFixed(0)}`;
@@ -59,16 +68,39 @@ function ListingCard({ listing, owned = false }: { listing: Listing; owned?: boo
       <header>
         <span className="pill">{listing.condition.replace('_', ' ')}</span>
         <span className="pill pill-secondary">{listing.category}</span>
-        {owned && <span className="pill pill-success">Your listing</span>}
+        {owned && listing.status === 'active' && (
+          <span className="pill pill-success">Active</span>
+        )}
+        {listing.status === 'reserved' && (
+          <span className="pill pill-warning">Reserved</span>
+        )}
       </header>
       <h3>{listing.title}</h3>
       <p className="meta">Size {listing.size} • {priceLabel}</p>
       <p className="description">{listing.description}</p>
+      {owned && onStatusChange && listing.status === 'active' && (
+        <div className="listing-actions">
+          <button
+            className="ghost small"
+            onClick={() => onStatusChange('cancelled')}
+          >
+            Remove Listing
+          </button>
+        </div>
+      )}
     </article>
   );
 }
 
-function NewListingForm({ onCreated }: { onCreated: (listing: Listing) => void }) {
+function NewListingForm({
+  userId,
+  campusId,
+  onCreated
+}: {
+  userId: string;
+  campusId: string;
+  onCreated: (listing: Listing) => void;
+}) {
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -85,7 +117,9 @@ function NewListingForm({ onCreated }: { onCreated: (listing: Listing) => void }
   const [aiMetadata, setAiMetadata] = useState<Record<string, unknown> | undefined>();
   const [autoFillLoading, setAutoFillLoading] = useState(false);
 
-  const handleChange = (field: keyof typeof form) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (field: keyof typeof form) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
@@ -151,52 +185,46 @@ function NewListingForm({ onCreated }: { onCreated: (listing: Listing) => void }
     setSubmitting(true);
     setMessage(null);
 
-    const payload = {
-      sellerId: DEFAULT_SELLER_ID,
-      campusId: DEFAULT_CAMPUS_ID,
-      title: form.title || 'Untitled listing',
-      description: form.description || 'Listed via ThreadLoop web MVP.',
-      category: form.category || 'General',
-      size: form.size || 'M',
-      condition: form.condition as Listing['condition'],
-      price: form.price ? Number(form.price) : undefined,
-      swapValue: form.swapValue ? Number(form.swapValue) : undefined,
-      status: 'active' as const,
-      aiMetadata,
-      images: [
-        {
-          storageUrl:
-            imageData ||
-            form.imageUrl ||
-            'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80'
-        }
-      ]
-    };
-
     try {
-      const response = await fetch(`${API_BASE_URL}/listings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const listing = await createListing({
+        sellerId: userId,
+        campusId: campusId,
+        title: form.title || 'Untitled listing',
+        description: form.description || 'Listed via ThreadLoop.',
+        category: form.category || 'General',
+        size: form.size || 'M',
+        condition: form.condition as Listing['condition'],
+        price: form.price ? Number(form.price) : undefined,
+        swapValue: form.swapValue ? Number(form.swapValue) : undefined,
+        aiMetadata,
+        images: [
+          {
+            storageUrl:
+              imageData ||
+              form.imageUrl ||
+              'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=900&q=80'
+          }
+        ]
       });
-      const body = await response.json();
-      if (!response.ok || !body.success) {
-        throw new Error(body.error ?? 'Failed to create listing');
+
+      if (listing) {
+        onCreated(listing);
+        setForm({
+          title: '',
+          description: '',
+          category: '',
+          size: '',
+          condition: 'like_new',
+          price: '',
+          swapValue: '',
+          imageUrl: ''
+        });
+        setImageData(null);
+        setAiMetadata(undefined);
+        setMessage('Listing published successfully!');
+      } else {
+        throw new Error('Failed to create listing');
       }
-      onCreated(body.data);
-      setForm({
-        title: '',
-        description: '',
-        category: '',
-        size: '',
-        condition: 'like_new',
-        price: '',
-        swapValue: '',
-        imageUrl: ''
-      });
-      setImageData(null);
-      setAiMetadata(undefined);
-      setMessage('Listing published successfully!');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
@@ -209,15 +237,28 @@ function NewListingForm({ onCreated }: { onCreated: (listing: Listing) => void }
       <div className="form-grid">
         <label className="field">
           <span>Title</span>
-          <input value={form.title} onChange={handleChange('title')} placeholder="e.g. Brown leather blazer" required />
+          <input
+            value={form.title}
+            onChange={handleChange('title')}
+            placeholder="e.g. Brown leather blazer"
+            required
+          />
         </label>
         <label className="field">
           <span>Category</span>
-          <input value={form.category} onChange={handleChange('category')} placeholder="Outerwear" />
+          <input
+            value={form.category}
+            onChange={handleChange('category')}
+            placeholder="Outerwear"
+          />
         </label>
         <label className="field">
           <span>Size</span>
-          <input value={form.size} onChange={handleChange('size')} placeholder="M" />
+          <input
+            value={form.size}
+            onChange={handleChange('size')}
+            placeholder="M"
+          />
         </label>
         <label className="field">
           <span>Condition</span>
@@ -230,19 +271,40 @@ function NewListingForm({ onCreated }: { onCreated: (listing: Listing) => void }
         </label>
         <label className="field">
           <span>Price (optional)</span>
-          <input type="number" value={form.price} onChange={handleChange('price')} min="0" step="1" />
+          <input
+            type="number"
+            value={form.price}
+            onChange={handleChange('price')}
+            min="0"
+            step="1"
+          />
         </label>
         <label className="field">
           <span>Swap value</span>
-          <input type="number" value={form.swapValue} onChange={handleChange('swapValue')} min="0" step="1" />
+          <input
+            type="number"
+            value={form.swapValue}
+            onChange={handleChange('swapValue')}
+            min="0"
+            step="1"
+          />
         </label>
         <label className="field field-full">
           <span>Description</span>
-          <textarea value={form.description} onChange={handleChange('description')} rows={3} placeholder="Texture, fit, campus meet-up preferences..." />
+          <textarea
+            value={form.description}
+            onChange={handleChange('description')}
+            rows={3}
+            placeholder="Texture, fit, campus meet-up preferences..."
+          />
         </label>
         <label className="field field-full">
           <span>Image URL</span>
-          <input value={form.imageUrl} onChange={handleChange('imageUrl')} placeholder="https://..." />
+          <input
+            value={form.imageUrl}
+            onChange={handleChange('imageUrl')}
+            placeholder="https://..."
+          />
           <small className="hint">Use any hosted photo or upload a quick mirror pic.</small>
         </label>
         <label className="field field-full">
@@ -252,13 +314,16 @@ function NewListingForm({ onCreated }: { onCreated: (listing: Listing) => void }
         </label>
       </div>
       <div className="actions actions-alt">
-        <button type="button" className="ghost" onClick={handleAutoFill} disabled={autoFillLoading}>
+        <button
+          type="button"
+          className="ghost"
+          onClick={handleAutoFill}
+          disabled={autoFillLoading}
+        >
           {autoFillLoading ? 'Letting AI think…' : 'Use AI to auto-fill'}
         </button>
         {aiMetadata && (
-          <span className="ai-tags">
-            AI tags: {formatAiMetadata(aiMetadata)}
-          </span>
+          <span className="ai-tags">AI tags: {formatAiMetadata(aiMetadata)}</span>
         )}
       </div>
       <div className="actions">
@@ -271,7 +336,13 @@ function NewListingForm({ onCreated }: { onCreated: (listing: Listing) => void }
   );
 }
 
-function ListingModal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function ListingModal({
+  children,
+  onClose
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -287,14 +358,58 @@ function ListingModal({ children, onClose }: { children: React.ReactNode; onClos
 }
 
 export function Closet() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [myListings, setMyListings] = useState<Listing[]>([]);
-  const [purchasedItems] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Load user's listings from Supabase
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadMyListings() {
+      setLoading(true);
+      const listings = await fetchMyListings(user.id);
+      setMyListings(listings);
+      setLoading(false);
+    }
+
+    loadMyListings();
+  }, [user]);
 
   const handleNewListing = (listing: Listing) => {
     setMyListings((prev) => [listing, ...prev]);
     setIsModalOpen(false);
   };
+
+  const handleStatusChange = async (listingId: string, status: 'active' | 'cancelled') => {
+    const success = await updateListingStatus(listingId, status);
+    if (success) {
+      if (status === 'cancelled') {
+        setMyListings((prev) => prev.filter((l) => l.id !== listingId));
+      } else {
+        setMyListings((prev) =>
+          prev.map((l) => (l.id === listingId ? { ...l, status } : l))
+        );
+      }
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="page-content">
+        <div className="empty-state">
+          <p>Please log in to manage your closet</p>
+          <button className="cta-primary" onClick={() => navigate('/login')}>
+            Go to Login
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const activeListings = myListings.filter((l) => l.status === 'active');
 
   return (
     <div className="page-content">
@@ -312,26 +427,23 @@ export function Closet() {
         </div>
 
         <div className="closet-section">
-          <h2>Your Active Listings ({myListings.length})</h2>
-          {myListings.length === 0 ? (
-            <p className="empty-state">You haven't listed any items yet. Click "Add Listing" to upload something from your wardrobe!</p>
+          <h2>Your Active Listings ({activeListings.length})</h2>
+          {loading ? (
+            <p className="loading-state">Loading your listings...</p>
+          ) : activeListings.length === 0 ? (
+            <p className="empty-state">
+              You haven't listed any items yet. Click "Add Listing" to upload something
+              from your wardrobe!
+            </p>
           ) : (
             <div className="grid">
-              {myListings.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} owned />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="closet-section">
-          <h2>Purchased Items ({purchasedItems.length})</h2>
-          {purchasedItems.length === 0 ? (
-            <p className="empty-state">You haven't purchased anything yet. Browse listings to find items you love!</p>
-          ) : (
-            <div className="grid">
-              {purchasedItems.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
+              {activeListings.map((listing) => (
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  owned
+                  onStatusChange={(status) => handleStatusChange(listing.id, status)}
+                />
               ))}
             </div>
           )}
@@ -340,7 +452,11 @@ export function Closet() {
 
       {isModalOpen && (
         <ListingModal onClose={() => setIsModalOpen(false)}>
-          <NewListingForm onCreated={handleNewListing} />
+          <NewListingForm
+            userId={user.id}
+            campusId={user.campusId || '22222222-2222-2222-2222-222222222222'}
+            onCreated={handleNewListing}
+          />
         </ListingModal>
       )}
     </div>
