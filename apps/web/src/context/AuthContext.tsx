@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Extract email from various possible locations in Auth0/SAML response
       // Fall back to the email the user entered before SAML redirect
-      const email = auth0User.email
+      let email = auth0User.email
         || auth0User['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress']
         || auth0User.preferred_username
         || auth0User.upn
@@ -85,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isBerkeleyUser = email?.endsWith('@berkeley.edu');
       const authProvider = isSamlUser ? 'stanford-saml' : 'auth0';
 
-      // Determine campus ID based on email domain
+      // Determine campus ID based on email domain or SAML provider
       let campusId = '22222222-2222-2222-2222-222222222222'; // Default to Stanford
       if (isBerkeleyUser) {
         campusId = '33333333-3333-3333-3333-333333333333';
@@ -96,14 +96,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (isStanfordUser) badges.push('stanford');
       if (isBerkeleyUser) badges.push('berkeley');
 
-      // Try to get existing user from Supabase - first by auth0_id, then by email
+      // Try to get existing user from Supabase - first by auth0_id
       let { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('auth0_id', auth0User.sub)
         .maybeSingle();
 
-      // If not found by auth0_id, try finding by email (handles auth0_id format changes)
+      // If not found by auth0_id and we have an email, try finding by email
       if (!existingUser && email) {
         const { data: userByEmail, error: emailFetchError } = await supabase
           .from('users')
@@ -126,6 +126,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!existingUser && (!fetchError || fetchError.code === 'PGRST116')) {
         // User doesn't exist, create new user
+        // If no email from SAML, generate a unique placeholder based on auth0 sub
+        if (!email && isSamlUser) {
+          // Create a unique email placeholder using a hash of the sub
+          const subHash = auth0User.sub.split('|').pop()?.substring(0, 16) || Date.now().toString();
+          email = `stanford-user-${subHash}@stanford.edu`;
+          console.log('No email from SAML, using placeholder:', email);
+        }
+
         console.log('Creating new user in Supabase...');
         const { data: newUser, error: insertError } = await supabase
           .from('users')
@@ -232,36 +240,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Failed to sync user to backend:', error);
-      // Fallback to basic user info if Supabase fails
-      const fallbackUser: ExtendedUserProfile = {
-        id: auth0User.sub || '',
-        email: auth0User.email || '',
-        emailVerified: false,
-        campusId: '',
-        displayName: auth0User.name || 'User',
-        authProvider: 'auth0',
-        lastLogin: new Date(),
-        createdAt: new Date(),
-        rating: 0,
-        totalRatings: 0,
-        swapCount: 0,
-        successfulSwaps: 0,
-        badges: ['verified-student'],
-        swapStreak: 0,
-        averageResponseTime: 0,
-        responseRate: 0,
-        styleVibes: [],
-        favoriteColors: [],
-        sizingProfile: {},
-        settings: {
-          showProfile: true,
-          allowMessages: true,
-          shareStylePreferences: true,
-          emailNotifications: true,
-          pushNotifications: true
-        }
-      };
-      setUser(fallbackUser);
+      // Don't set a fallback user with invalid ID - this prevents broken DB queries
+      // The user will need to log in again or we need to fix the data issue
+      setUser(null);
+
+      // Show a user-friendly error message
+      console.error('Unable to sync user. You may need to log out and log in again, or contact support if the issue persists.');
     } finally {
       setIsLoading(false);
     }
