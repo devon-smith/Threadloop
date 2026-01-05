@@ -136,19 +136,26 @@ let visionClient: InstanceType<typeof vision.ImageAnnotatorClient> | null = null
 
 function getVisionClient(): InstanceType<typeof vision.ImageAnnotatorClient> {
   if (!visionClient) {
-    // Check for credentials
-    const credentials = process.env.GOOGLE_CLOUD_CREDENTIALS;
-    if (credentials) {
-      // Parse JSON credentials from environment variable
-      const parsedCredentials = JSON.parse(credentials);
+    // Check for API Key first (simplest option)
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
+    if (apiKey) {
       visionClient = new vision.ImageAnnotatorClient({
-        credentials: parsedCredentials
+        apiKey: apiKey
       });
-    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      // Use file-based credentials
-      visionClient = new vision.ImageAnnotatorClient();
     } else {
-      throw new Error('Google Cloud credentials not configured. Set GOOGLE_CLOUD_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS.');
+      // Check for JSON credentials in environment variable
+      const credentials = process.env.GOOGLE_CLOUD_CREDENTIALS;
+      if (credentials) {
+        const parsedCredentials = JSON.parse(credentials);
+        visionClient = new vision.ImageAnnotatorClient({
+          credentials: parsedCredentials
+        });
+      } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        // Use file-based credentials
+        visionClient = new vision.ImageAnnotatorClient();
+      } else {
+        throw new Error('Google Cloud credentials not configured. Set GOOGLE_CLOUD_API_KEY, GOOGLE_CLOUD_CREDENTIALS, or GOOGLE_APPLICATION_CREDENTIALS.');
+      }
     }
   }
   return visionClient;
@@ -343,5 +350,5 @@ export async function analyzeClothingImage(imageData: string): Promise<ClothingA
 
 // Check if Vision API is configured
 export function isVisionConfigured(): boolean {
-  return !!(process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  return !!(process.env.GOOGLE_CLOUD_API_KEY || process.env.GOOGLE_CLOUD_CREDENTIALS || process.env.GOOGLE_APPLICATION_CREDENTIALS);
 }
