@@ -1,5 +1,84 @@
 import { supabase } from './supabase';
 
+// Demo seller ID - we'll create this user if needed
+const DEMO_SELLER_ID = '00000000-0000-0000-0000-000000000001';
+const DEFAULT_CAMPUS_ID = '22222222-2222-2222-2222-222222222222';
+
+// Create demo users for sample listings
+async function ensureDemoUsers(): Promise<string[]> {
+  const demoUsers = [
+    {
+      id: '00000000-0000-0000-0000-000000000001',
+      auth0_id: 'demo|user1',
+      email: 'demo1@stanford.edu',
+      display_name: 'Alex Chen',
+      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
+      bio: 'Senior at Stanford. Clearing out my closet before graduation!',
+      rating: 4.9,
+      total_ratings: 24
+    },
+    {
+      id: '00000000-0000-0000-0000-000000000002',
+      auth0_id: 'demo|user2',
+      email: 'demo2@stanford.edu',
+      display_name: 'Jordan Taylor',
+      avatar_url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop',
+      bio: 'Fashion enthusiast. Love sustainable style!',
+      rating: 4.8,
+      total_ratings: 18
+    },
+    {
+      id: '00000000-0000-0000-0000-000000000003',
+      auth0_id: 'demo|user3',
+      email: 'demo3@stanford.edu',
+      display_name: 'Sam Rivera',
+      avatar_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop',
+      bio: 'Junior. Upgrading my wardrobe every quarter.',
+      rating: 4.7,
+      total_ratings: 12
+    }
+  ];
+
+  const createdIds: string[] = [];
+
+  for (const user of demoUsers) {
+    // Check if user already exists
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!existing) {
+      const { error } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          auth0_id: user.auth0_id,
+          email: user.email,
+          email_verified: true,
+          campus_id: DEFAULT_CAMPUS_ID,
+          display_name: user.display_name,
+          avatar_url: user.avatar_url,
+          bio: user.bio,
+          auth_provider: 'demo',
+          rating: user.rating,
+          total_ratings: user.total_ratings
+        });
+
+      if (error) {
+        console.error('Error creating demo user:', error);
+      } else {
+        createdIds.push(user.id);
+      }
+    } else {
+      createdIds.push(user.id);
+    }
+  }
+
+  return createdIds;
+}
+
 // Fresh, high-quality Unsplash images for sample listings
 const SAMPLE_LISTINGS = [
   {
@@ -124,19 +203,32 @@ const SAMPLE_LISTINGS = [
   }
 ];
 
-// Default campus ID for Stanford
-const DEFAULT_CAMPUS_ID = '22222222-2222-2222-2222-222222222222';
-
-export async function seedSampleListings(sellerId: string): Promise<{ success: boolean; count: number; error?: string }> {
+// Seed sample listings - creates demo users if needed, then creates listings
+export async function seedSampleListings(sellerId?: string): Promise<{ success: boolean; count: number; error?: string }> {
   try {
+    // First, ensure we have demo users
+    const demoUserIds = await ensureDemoUsers();
+
+    if (demoUserIds.length === 0 && !sellerId) {
+      return {
+        success: false,
+        count: 0,
+        error: 'Could not create demo users and no seller ID provided'
+      };
+    }
+
     let createdCount = 0;
 
-    for (const listing of SAMPLE_LISTINGS) {
+    for (let i = 0; i < SAMPLE_LISTINGS.length; i++) {
+      const listing = SAMPLE_LISTINGS[i];
+      // Rotate through demo users for variety, or use provided sellerId
+      const listingSellerId = sellerId || demoUserIds[i % demoUserIds.length];
+
       // Create the listing
       const { data: newListing, error: listingError } = await supabase
         .from('listings')
         .insert({
-          seller_id: sellerId,
+          seller_id: listingSellerId,
           campus_id: DEFAULT_CAMPUS_ID,
           title: listing.title,
           description: listing.description,
@@ -159,13 +251,13 @@ export async function seedSampleListings(sellerId: string): Promise<{ success: b
       }
 
       // Add image(s)
-      for (let i = 0; i < listing.images.length; i++) {
+      for (let j = 0; j < listing.images.length; j++) {
         const { error: imageError } = await supabase
           .from('listing_images')
           .insert({
             listing_id: newListing.id,
-            storage_url: listing.images[i],
-            position: i
+            storage_url: listing.images[j],
+            position: j
           });
 
         if (imageError) {

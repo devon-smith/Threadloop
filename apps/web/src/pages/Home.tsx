@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Listing } from '@threadloop/shared';
 import { fetchListings } from '../lib/listings';
+import { seedSampleListings, checkSampleListingsExist } from '../lib/seedListings';
 
 function ListingCard({ listing }: { listing: Listing }) {
   const priceLabel = listing.price
@@ -32,22 +33,53 @@ export function Home() {
   const [data, setData] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMessage, setSeedMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    async function loadListings() {
-      try {
-        setLoading(true);
-        const listings = await fetchListings({ limit: 6 });
-        setData(listings);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unable to load listings');
-      } finally {
-        setLoading(false);
-      }
+  const loadListings = async () => {
+    try {
+      setLoading(true);
+      const listings = await fetchListings({ limit: 6 });
+      setData(listings);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load listings');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadListings();
   }, []);
+
+  // Seed sample listings for demo
+  const handleSeedListings = async () => {
+    setSeeding(true);
+    setSeedMessage(null);
+
+    try {
+      const exists = await checkSampleListingsExist();
+      if (exists) {
+        setSeedMessage('Sample listings already exist!');
+        setSeeding(false);
+        return;
+      }
+
+      const result = await seedSampleListings();
+      if (result.success) {
+        setSeedMessage(`Added ${result.count} sample listings!`);
+        // Reload listings
+        await loadListings();
+      } else {
+        setSeedMessage(result.error || 'Failed to seed listings');
+      }
+    } catch (err) {
+      setSeedMessage('Error seeding listings');
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const campusFeatures = [
     {
@@ -132,7 +164,21 @@ export function Home() {
               <ListingCard key={listing.id} listing={listing} />
             ))}
             {!loading && data.length === 0 && !error && (
-              <p>No listings posted yet. Use the API to seed sample data.</p>
+              <div className="empty-listings">
+                <p>No listings yet. Add some sample data to get started!</p>
+                <button
+                  className="cta-primary"
+                  onClick={handleSeedListings}
+                  disabled={seeding}
+                >
+                  {seeding ? 'Adding samples...' : 'Load Sample Listings'}
+                </button>
+                {seedMessage && (
+                  <p className={`seed-message ${seedMessage.includes('Added') ? 'success' : ''}`}>
+                    {seedMessage}
+                  </p>
+                )}
+              </div>
             )}
           </div>
           {data.length > 6 && (
