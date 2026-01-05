@@ -356,6 +356,15 @@ button {
   font-size: 14px;
 }
 
+.brand {
+  color: #4a4a4a;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 2px 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .description {
   color: #2d2d2d;
   font-size: 15px;

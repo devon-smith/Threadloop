@@ -21,8 +21,19 @@ const CATEGORIES = [
   'Other'
 ];
 
-// Common sizes
-const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
+// Common clothing sizes
+const CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
+
+// Shoe sizes
+const SHOE_SIZES = ['5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '13', '14'];
+
+// Helper to get sizes based on category
+const getSizesForCategory = (category: string) => {
+  if (category === 'Shoes' || category === 'Footwear') {
+    return SHOE_SIZES;
+  }
+  return CLOTHING_SIZES;
+};
 
 function ListingCard({
   listing,
@@ -61,6 +72,7 @@ function ListingCard({
         )}
       </header>
       <h3>{listing.title}</h3>
+      {listing.brand && <p className="brand">{listing.brand}</p>}
       <p className="meta">Size {listing.size} • {priceLabel}</p>
       <p className="description">{listing.description}</p>
       {owned && onStatusChange && listing.status === 'active' && (
@@ -119,12 +131,25 @@ function NewListingForm({
   const handleChange = (field: keyof typeof form) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+    const newValue = event.target.value;
+    
+    // If category changes, reset size to appropriate default
+    if (field === 'category') {
+      const newSizes = getSizesForCategory(newValue);
+      const currentSizeValid = newSizes.includes(form.size);
+      setForm((prev) => ({
+        ...prev,
+        category: newValue,
+        size: currentSizeValid ? prev.size : newSizes[Math.floor(newSizes.length / 2)] // Default to middle size
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [field]: newValue }));
+    }
 
     // Update price suggestion when category or condition changes
     if (field === 'category' || field === 'condition') {
-      const newCategory = field === 'category' ? event.target.value : form.category;
-      const newCondition = field === 'condition' ? event.target.value : form.condition;
+      const newCategory = field === 'category' ? newValue : form.category;
+      const newCondition = field === 'condition' ? newValue : form.condition;
       const suggestion = suggestPrice(newCategory, newCondition, form.brand || undefined);
       setPriceSuggestion(suggestion);
       setDemandInfo(getCategoryDemand(newCategory));
@@ -353,7 +378,7 @@ function NewListingForm({
           <div className="field">
             <label htmlFor="size">Size</label>
             <select id="size" value={form.size} onChange={handleChange('size')}>
-              {SIZES.map(size => (
+              {getSizesForCategory(form.category).map((size: string) => (
                 <option key={size} value={size}>{size}</option>
               ))}
             </select>
