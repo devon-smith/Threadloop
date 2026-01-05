@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Listing } from '@threadloop/shared';
-import { useListings } from '../hooks/useListings';
+import { fetchListings } from '../lib/listings';
 
 function ListingCard({ listing }: { listing: Listing }) {
   const priceLabel = listing.price
@@ -29,8 +29,25 @@ function ListingCard({ listing }: { listing: Listing }) {
 }
 
 export function Home() {
-  const { data, loading, error } = useListings();
+  const [data, setData] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function loadListings() {
+      try {
+        setLoading(true);
+        const listings = await fetchListings({ limit: 6 });
+        setData(listings);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to load listings');
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadListings();
+  }, []);
 
   const campusFeatures = [
     {

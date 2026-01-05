@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import type { Listing } from '@threadloop/shared';
 import { useAuth } from '../context/AuthContext';
 import { fetchMyListings, createListing, updateListingStatus } from '../lib/listings';
+import { generateListingSuggestions, suggestPrice, getCategoryDemand } from '../lib/aiSuggestions';
+import { seedSampleListings, checkSampleListingsExist } from '../lib/seedListings';
 
 // Common clothing categories
 const CATEGORIES = [
@@ -85,12 +87,21 @@ function NewListingForm({
   onCreated: (listing: Listing) => void;
   onCancel: () => void;
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    title: string;
+    description: string;
+    category: string;
+    size: string;
+    condition: 'new' | 'like_new' | 'good' | 'fair';
+    price: string;
+    swapValue: string;
+    brand: string;
+  }>({
     title: '',
     description: '',
     category: 'Tops',
     size: 'M',
-    condition: 'like_new' as const,
+    condition: 'like_new',
     price: '',
     swapValue: '',
     brand: ''
@@ -98,12 +109,58 @@ function NewListingForm({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>([]);
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiSuggested, setAiSuggested] = useState(false);
+  const [demandInfo, setDemandInfo] = useState<{ level: string; reason: string } | null>(null);
+  const [priceSuggestion, setPriceSuggestion] = useState<{ suggested: number; range: { min: number; max: number } } | null>(null);
   const MAX_IMAGES = 5;
 
   const handleChange = (field: keyof typeof form) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
+
+    // Update price suggestion when category or condition changes
+    if (field === 'category' || field === 'condition') {
+      const newCategory = field === 'category' ? event.target.value : form.category;
+      const newCondition = field === 'condition' ? event.target.value : form.condition;
+      const suggestion = suggestPrice(newCategory, newCondition, form.brand || undefined);
+      setPriceSuggestion(suggestion);
+      setDemandInfo(getCategoryDemand(newCategory));
+    }
+  };
+
+  // Process image with AI when first image is uploaded
+  const processWithAI = async (imageData: string, filename?: string) => {
+    setAiProcessing(true);
+    try {
+      const suggestions = await generateListingSuggestions(imageData, filename, {
+        category: form.category !== 'Tops' ? form.category : undefined,
+        brand: form.brand || undefined
+      });
+
+      // Apply AI suggestions to form
+      setForm(prev => ({
+        ...prev,
+        title: suggestions.title,
+        description: suggestions.description,
+        category: suggestions.category,
+        size: suggestions.size,
+        condition: suggestions.condition,
+        price: String(suggestions.price),
+        brand: suggestions.brand || prev.brand
+      }));
+
+      // Update demand and price info
+      setDemandInfo(getCategoryDemand(suggestions.category));
+      setPriceSuggestion(suggestPrice(suggestions.category, suggestions.condition, suggestions.brand));
+      setAiSuggested(true);
+      setMessage('AI suggestions applied! Feel free to edit any field.');
+    } catch (error) {
+      console.error('AI processing error:', error);
+    } finally {
+      setAiProcessing(false);
+    }
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,8 +175,9 @@ function NewListingForm({
     }
 
     const filesToProcess = Array.from(files).slice(0, spotsLeft);
+    const isFirstImage = images.length === 0;
 
-    filesToProcess.forEach(file => {
+    filesToProcess.forEach((file, index) => {
       // Check file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         setMessage('Each image must be less than 5MB');
@@ -129,8 +187,14 @@ function NewListingForm({
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === 'string') {
-          setImages(prev => [...prev, reader.result as string]);
+          const imageData = reader.result as string;
+          setImages(prev => [...prev, imageData]);
           setMessage(null);
+
+          // Trigger AI processing for the first image
+          if (isFirstImage && index === 0 && !aiSuggested) {
+            processWithAI(imageData, file.name);
+          }
         }
       };
       reader.readAsDataURL(file);
@@ -228,7 +292,39 @@ function NewListingForm({
           className="hidden-input"
         />
         <p className="image-hint">First image will be the cover photo. Add up to {MAX_IMAGES} images.</p>
+
+        {/* AI Processing Status */}
+        {aiProcessing && (
+          <div className="ai-status processing">
+            <span className="ai-icon">🤖</span>
+            <span>AI is analyzing your image...</span>
+          </div>
+        )}
+        {aiSuggested && !aiProcessing && (
+          <div className="ai-status success">
+            <span className="ai-icon">✨</span>
+            <span>AI suggestions applied! Edit any field below.</span>
+          </div>
+        )}
       </div>
+
+      {/* Demand & Pricing Insights */}
+      {demandInfo && (
+        <div className={`demand-insight ${demandInfo.level}`}>
+          <div className="demand-header">
+            <span className={`demand-badge ${demandInfo.level}`}>
+              {demandInfo.level.toUpperCase()} DEMAND
+            </span>
+            <span className="demand-reason">{demandInfo.reason}</span>
+          </div>
+          {priceSuggestion && (
+            <div className="price-insight">
+              <span>Suggested: <strong>${priceSuggestion.suggested}</strong></span>
+              <span className="price-range">(Range: ${priceSuggestion.range.min} - ${priceSuggestion.range.max})</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Form Fields */}
       <div className="form-fields">
@@ -368,6 +464,8 @@ export function Closet() {
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedMessage, setSeedMessage] = useState<string | null>(null);
 
   // Load user's listings from Supabase
   useEffect(() => {
@@ -383,6 +481,37 @@ export function Closet() {
 
     loadMyListings();
   }, [user]);
+
+  // Seed sample listings for demo
+  const handleSeedListings = async () => {
+    if (!user) return;
+
+    setSeeding(true);
+    setSeedMessage(null);
+
+    try {
+      const exists = await checkSampleListingsExist();
+      if (exists) {
+        setSeedMessage('Sample listings already exist in the database.');
+        setSeeding(false);
+        return;
+      }
+
+      const result = await seedSampleListings(user.id);
+      if (result.success) {
+        setSeedMessage(`Added ${result.count} sample listings! Refresh to see them.`);
+        // Reload listings
+        const listings = await fetchMyListings(user.id);
+        setMyListings(listings);
+      } else {
+        setSeedMessage(result.error || 'Failed to seed listings');
+      }
+    } catch (error) {
+      setSeedMessage('Error seeding listings');
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const handleNewListing = (listing: Listing) => {
     setMyListings((prev) => [listing, ...prev]);
@@ -441,9 +570,23 @@ export function Closet() {
               <span className="empty-icon">👕</span>
               <h3>Your closet is empty</h3>
               <p>List items you want to sell or swap with other students</p>
-              <button className="cta-primary" onClick={() => setIsModalOpen(true)}>
-                Add Your First Listing
-              </button>
+              <div className="empty-closet-actions">
+                <button className="cta-primary" onClick={() => setIsModalOpen(true)}>
+                  Add Your First Listing
+                </button>
+                <button
+                  className="cta-secondary"
+                  onClick={handleSeedListings}
+                  disabled={seeding}
+                >
+                  {seeding ? 'Adding...' : 'Add Sample Listings (Demo)'}
+                </button>
+              </div>
+              {seedMessage && (
+                <p className={`seed-message ${seedMessage.includes('Added') ? 'success' : ''}`}>
+                  {seedMessage}
+                </p>
+              )}
             </div>
           ) : (
             <div className="grid">

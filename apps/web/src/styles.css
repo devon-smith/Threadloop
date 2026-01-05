@@ -3006,3 +3006,157 @@ button {
 .listing-actions {
   margin-top: 20px;
 }
+
+
+/* AI Features & Suggestions */
+.ai-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-top: 12px;
+  font-size: 14px;
+  animation: fadeIn 0.3s ease;
+}
+
+.ai-status.processing {
+  background: linear-gradient(135deg, #e8f0ff 0%, #f0e8ff 100%);
+  color: #5d3bff;
+}
+
+.ai-status.success {
+  background: linear-gradient(135deg, #e8fff0 0%, #e8f8ff 100%);
+  color: #00a86b;
+}
+
+.ai-icon {
+  font-size: 18px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Demand Insights */
+.demand-insight {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #e8e8e8;
+  animation: fadeIn 0.3s ease;
+}
+
+.demand-insight.high {
+  border-color: #00a86b;
+  background: linear-gradient(135deg, #f0fff5 0%, #ffffff 100%);
+}
+
+.demand-insight.medium {
+  border-color: #ffc107;
+  background: linear-gradient(135deg, #fffbf0 0%, #ffffff 100%);
+}
+
+.demand-insight.low {
+  border-color: #aaa;
+  background: white;
+}
+
+.demand-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.demand-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.demand-badge.high {
+  background: #00a86b;
+  color: white;
+}
+
+.demand-badge.medium {
+  background: #ffc107;
+  color: #333;
+}
+
+.demand-badge.low {
+  background: #e0e0e0;
+  color: #666;
+}
+
+.demand-reason {
+  color: #666;
+  font-size: 13px;
+}
+
+.price-insight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.price-insight strong {
+  color: #5d3bff;
+  font-size: 18px;
+}
+
+.price-range {
+  color: #888;
+  font-size: 12px;
+}
+
+/* Empty Closet Actions */
+.empty-closet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.seed-message {
+  margin-top: 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: #fff3cd;
+  color: #856404;
+  font-size: 14px;
+}
+
+.seed-message.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+/* CTA Secondary Button */
+.cta-secondary {
+  background: white;
+  color: #5d3bff;
+  border: 2px solid #5d3bff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cta-secondary:hover:not(:disabled) {
+  background: #5d3bff;
+  color: white;
+}
+
+.cta-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
