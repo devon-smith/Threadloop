@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@google-cloud/vision": "^5.3.4",
     "@supabase/supabase-js": "^2.89.0",
     "@threadloop/shared": "workspace:*",
     "cors": "^2.8.5",

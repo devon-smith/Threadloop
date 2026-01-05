@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { extractImageFeatures, extractImageFeaturesFromUrl } from '../ai/imageFeatureExtractor';
 import { predictAttributes } from '../ai/attributePredictor';
+import { analyzeClothingImage, isVisionConfigured } from '../ai/visionAnalyzer';
 import type { ClothingCategory } from '../ai/clothingTaxonomy';
 
 const router = Router();
@@ -27,18 +28,48 @@ router.post('/listing-suggestions', async (req, res) => {
   try {
     const { imageData, imageUrl, category, size } = parsed.data;
 
-    // Extract image features
+    // Try Google Vision API first if configured
+    if (isVisionConfigured() && imageData) {
+      try {
+        const visionResult = await analyzeClothingImage(imageData);
+        
+        return res.json({
+          success: true,
+          data: {
+            title: visionResult.suggestedTitle,
+            description: visionResult.suggestedDescription,
+            category: visionResult.category,
+            subcategory: visionResult.subcategory,
+            size: size || 'M',
+            condition: visionResult.condition,
+            price: undefined, // Let user set price
+            aiMetadata: {
+              primaryColor: visionResult.primaryColor,
+              secondaryColor: visionResult.secondaryColor,
+              pattern: visionResult.pattern,
+              qualityScore: visionResult.qualityScore,
+              labels: visionResult.allLabels,
+              confidence: visionResult.confidence,
+              source: 'google-vision'
+            }
+          }
+        });
+      } catch (visionError) {
+        console.warn('Vision API failed, falling back to mock:', visionError);
+        // Fall through to mock prediction
+      }
+    }
+
+    // Fallback: Use mock prediction
     const imageFeatures = imageData
       ? await extractImageFeatures(imageData)
       : await extractImageFeaturesFromUrl(imageUrl!);
 
-    // Predict attributes using AI model
     const prediction = await predictAttributes(imageFeatures, {
       category: category as ClothingCategory,
       size
     });
 
-    // Return standardized listing suggestion
     return res.json({
       success: true,
       data: {
@@ -51,7 +82,8 @@ router.post('/listing-suggestions', async (req, res) => {
         aiMetadata: {
           attributes: prediction.attributes,
           ...prediction.aiMetadata,
-          confidence: prediction.confidence
+          confidence: prediction.confidence,
+          source: 'mock-prediction'
         }
       }
     });
@@ -62,6 +94,15 @@ router.post('/listing-suggestions', async (req, res) => {
       error: 'AI processing failed. Please try again.'
     });
   }
+});
+
+// Check Vision API status
+router.get('/status', (_req, res) => {
+  res.json({
+    success: true,
+    visionEnabled: isVisionConfigured(),
+    features: ['label-detection', 'color-extraction', 'pattern-detection', 'quality-assessment']
+  });
 });
 
 export default router;
