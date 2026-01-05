@@ -93,11 +93,12 @@ function NewListingForm({
     condition: 'like_new' as const,
     price: '',
     swapValue: '',
-    imageUrl: ''
+    brand: ''
   });
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [imageData, setImageData] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const MAX_IMAGES = 5;
 
   const handleChange = (field: keyof typeof form) => (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -106,26 +107,41 @@ function NewListingForm({
   };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      setImageData(null);
+    const files = event.target.files;
+    if (!files) return;
+
+    // Check how many more images we can add
+    const spotsLeft = MAX_IMAGES - images.length;
+    if (spotsLeft <= 0) {
+      setMessage(`Maximum ${MAX_IMAGES} images allowed`);
       return;
     }
 
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage('Image must be less than 5MB');
-      return;
-    }
+    const filesToProcess = Array.from(files).slice(0, spotsLeft);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setImageData(reader.result);
-        setMessage(null);
+    filesToProcess.forEach(file => {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setMessage('Each image must be less than 5MB');
+        return;
       }
-    };
-    reader.readAsDataURL(file);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setImages(prev => [...prev, reader.result as string]);
+          setMessage(null);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Clear the input so the same file can be selected again
+    event.target.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -136,8 +152,8 @@ function NewListingForm({
       return;
     }
 
-    if (!imageData && !form.imageUrl) {
-      setMessage('Please add an image');
+    if (images.length === 0) {
+      setMessage('Please add at least one image');
       return;
     }
 
@@ -153,13 +169,10 @@ function NewListingForm({
         category: form.category,
         size: form.size,
         condition: form.condition,
+        brand: form.brand.trim() || undefined,
         price: form.price ? Number(form.price) : undefined,
         swapValue: form.swapValue ? Number(form.swapValue) : undefined,
-        images: [
-          {
-            storageUrl: imageData || form.imageUrl
-          }
-        ]
+        images: images.map(img => ({ storageUrl: img }))
       });
 
       if (listing) {
@@ -174,45 +187,47 @@ function NewListingForm({
     }
   };
 
-  const imagePreview = imageData || form.imageUrl;
-
   return (
     <form className="listing-form" onSubmit={handleSubmit}>
-      {/* Image Upload Section */}
+      {/* Image Upload Section - Multiple Images */}
       <div className="image-upload-section">
-        <div
-          className={`image-drop-zone ${imagePreview ? 'has-image' : ''}`}
-          onClick={() => document.getElementById('image-input')?.click()}
-        >
-          {imagePreview ? (
-            <img src={imagePreview} alt="Preview" className="image-preview-large" />
-          ) : (
-            <div className="upload-placeholder">
-              <span className="upload-icon">📷</span>
-              <span>Click to upload photo</span>
-              <span className="upload-hint">or drag and drop</span>
+        <div className="images-grid">
+          {images.map((img, idx) => (
+            <div key={idx} className="image-preview-item">
+              <img src={img} alt={`Preview ${idx + 1}`} />
+              <button
+                type="button"
+                className="remove-image-btn"
+                onClick={() => removeImage(idx)}
+                aria-label="Remove image"
+              >
+                ×
+              </button>
+              {idx === 0 && <span className="cover-badge">Cover</span>}
+            </div>
+          ))}
+          {images.length < MAX_IMAGES && (
+            <div
+              className="image-drop-zone add-more"
+              onClick={() => document.getElementById('image-input')?.click()}
+            >
+              <div className="upload-placeholder">
+                <span className="upload-icon">+</span>
+                <span>{images.length === 0 ? 'Add photos' : 'Add more'}</span>
+                <span className="upload-hint">{images.length}/{MAX_IMAGES}</span>
+              </div>
             </div>
           )}
-          <input
-            id="image-input"
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden-input"
-          />
         </div>
-        {imagePreview && (
-          <button
-            type="button"
-            className="change-image-btn"
-            onClick={() => {
-              setImageData(null);
-              setForm(prev => ({ ...prev, imageUrl: '' }));
-            }}
-          >
-            Remove image
-          </button>
-        )}
+        <input
+          id="image-input"
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={handleImageUpload}
+          className="hidden-input"
+        />
+        <p className="image-hint">First image will be the cover photo. Add up to {MAX_IMAGES} images.</p>
       </div>
 
       {/* Form Fields */}
@@ -288,6 +303,16 @@ function NewListingForm({
         </div>
 
         <div className="field">
+          <label htmlFor="brand">Brand (optional)</label>
+          <input
+            id="brand"
+            value={form.brand}
+            onChange={handleChange('brand')}
+            placeholder="e.g., Nike, Zara, Vintage"
+          />
+        </div>
+
+        <div className="field">
           <label htmlFor="description">Description</label>
           <textarea
             id="description"
@@ -295,17 +320,6 @@ function NewListingForm({
             onChange={handleChange('description')}
             rows={3}
             placeholder="Describe the item, its condition, and any meetup preferences..."
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="imageUrl">Or paste image URL</label>
-          <input
-            id="imageUrl"
-            value={form.imageUrl}
-            onChange={handleChange('imageUrl')}
-            placeholder="https://..."
-            disabled={!!imageData}
           />
         </div>
       </div>

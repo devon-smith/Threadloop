@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Listing } from '@threadloop/shared';
-import { fetchListings } from '../lib/listings';
+import { fetchListings, fetchFavorites, addFavorite, removeFavorite } from '../lib/listings';
 import { startConversation } from '../lib/messages';
 import { useAuth } from '../context/AuthContext';
 
@@ -22,10 +22,14 @@ type ListingWithSeller = Listing & {
 
 function ListingCard({
   listing,
-  onClick
+  onClick,
+  isFavorite,
+  onToggleFavorite
 }: {
   listing: ListingWithSeller;
   onClick: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (e: React.MouseEvent) => void;
 }) {
   const priceLabel = useMemo(() => {
     if (listing.price) {
@@ -43,6 +47,15 @@ function ListingCard({
     <article className="card listing-card" onClick={onClick}>
       {coverImage && (
         <img className="card-image" src={coverImage} alt={listing.title} loading="lazy" />
+      )}
+      {onToggleFavorite && (
+        <button
+          className={`favorite-btn ${isFavorite ? 'favorited' : ''}`}
+          onClick={onToggleFavorite}
+          aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          {isFavorite ? '♥' : '♡'}
+        </button>
       )}
       <header>
         <span className="pill">{listing.condition.replace('_', ' ')}</span>
@@ -72,18 +85,28 @@ function ListingCard({
 function ListingDetailModal({
   listing,
   onClose,
-  onContactSeller
+  onContactSeller,
+  onMakeOffer,
+  isFavorite,
+  onToggleFavorite
 }: {
   listing: ListingWithSeller;
   onClose: () => void;
   onContactSeller: (message: string) => Promise<void>;
+  onMakeOffer: (amount: number, message: string) => Promise<void>;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }) {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [showOfferForm, setShowOfferForm] = useState(false);
+  const [offerAmount, setOfferAmount] = useState(listing.price?.toString() || '');
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const isOwnListing = user?.id === listing.sellerId;
+  const hasMultipleImages = listing.images && listing.images.length > 1;
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,11 +118,34 @@ function ListingDetailModal({
     setMessage('');
   };
 
+  const handleMakeOffer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!offerAmount || sending) return;
+    setSending(true);
+    const offerMsg = message.trim() || `I'd like to offer $${offerAmount} for this item.`;
+    await onMakeOffer(Number(offerAmount), offerMsg);
+    setSending(false);
+    setSent(true);
+    setShowOfferForm(false);
+  };
+
   const priceLabel = listing.price
     ? `$${listing.price.toFixed(0)}`
     : listing.swapValue
     ? `Swap value: $${listing.swapValue.toFixed(0)}`
     : 'Open to offers';
+
+  const nextImage = () => {
+    if (listing.images && listing.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev + 1) % listing.images.length);
+    }
+  };
+
+  const prevImage = () => {
+    if (listing.images && listing.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev - 1 + listing.images.length) % listing.images.length);
+    }
+  };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -108,8 +154,28 @@ function ListingDetailModal({
 
         <div className="listing-detail-content">
           <div className="listing-detail-images">
-            {listing.images?.[0]?.storageUrl ? (
-              <img src={listing.images[0].storageUrl} alt={listing.title} />
+            {listing.images && listing.images.length > 0 ? (
+              <div className="image-carousel">
+                <img
+                  src={listing.images[currentImageIndex]?.storageUrl}
+                  alt={`${listing.title} - image ${currentImageIndex + 1}`}
+                />
+                {hasMultipleImages && (
+                  <>
+                    <button className="carousel-btn prev" onClick={prevImage}>‹</button>
+                    <button className="carousel-btn next" onClick={nextImage}>›</button>
+                    <div className="carousel-dots">
+                      {listing.images.map((_, idx) => (
+                        <span
+                          key={idx}
+                          className={`dot ${idx === currentImageIndex ? 'active' : ''}`}
+                          onClick={() => setCurrentImageIndex(idx)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             ) : (
               <div className="no-image">No image</div>
             )}
@@ -117,13 +183,24 @@ function ListingDetailModal({
 
           <div className="listing-detail-info">
             <div className="listing-detail-header">
-              <span className="pill">{listing.condition.replace('_', ' ')}</span>
-              <span className="pill pill-secondary">{listing.category}</span>
+              <div className="listing-pills">
+                <span className="pill">{listing.condition.replace('_', ' ')}</span>
+                <span className="pill pill-secondary">{listing.category}</span>
+              </div>
+              {user && !isOwnListing && onToggleFavorite && (
+                <button
+                  className={`favorite-btn-large ${isFavorite ? 'favorited' : ''}`}
+                  onClick={onToggleFavorite}
+                >
+                  {isFavorite ? '♥ Saved' : '♡ Save'}
+                </button>
+              )}
             </div>
 
             <h2>{listing.title}</h2>
             <p className="listing-price-large">{priceLabel}</p>
             <p className="listing-size">Size: {listing.size}</p>
+            {listing.brand && <p className="listing-brand">Brand: {listing.brand}</p>}
 
             {listing.description && (
               <p className="listing-description">{listing.description}</p>
@@ -147,23 +224,70 @@ function ListingDetailModal({
               </div>
             )}
 
-            {user && !isOwnListing && !sent && (
-              <form className="contact-seller-form" onSubmit={handleSendMessage}>
+            {user && !isOwnListing && !sent && !showOfferForm && (
+              <div className="listing-actions">
+                <form className="contact-seller-form" onSubmit={handleSendMessage}>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder={`Hi! Is this ${listing.title} still available?`}
+                    rows={3}
+                  />
+                  <div className="action-buttons">
+                    <button type="submit" disabled={!message.trim() || sending}>
+                      {sending ? 'Sending...' : 'Message Seller'}
+                    </button>
+                    {listing.price && (
+                      <button
+                        type="button"
+                        className="offer-btn"
+                        onClick={() => setShowOfferForm(true)}
+                      >
+                        Make Offer
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
+
+            {user && !isOwnListing && !sent && showOfferForm && (
+              <form className="offer-form" onSubmit={handleMakeOffer}>
+                <h3>Make an Offer</h3>
+                <div className="offer-input-row">
+                  <span className="currency-prefix">$</span>
+                  <input
+                    type="number"
+                    value={offerAmount}
+                    onChange={(e) => setOfferAmount(e.target.value)}
+                    placeholder="Your offer"
+                    min="1"
+                    step="1"
+                  />
+                </div>
+                {listing.price && (
+                  <p className="offer-hint">Asking price: ${listing.price}</p>
+                )}
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder={`Hi! Is this ${listing.title} still available?`}
-                  rows={3}
+                  placeholder="Add a message (optional)"
+                  rows={2}
                 />
-                <button type="submit" disabled={!message.trim() || sending}>
-                  {sending ? 'Sending...' : 'Message Seller'}
-                </button>
+                <div className="action-buttons">
+                  <button type="button" className="ghost" onClick={() => setShowOfferForm(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={!offerAmount || sending}>
+                    {sending ? 'Sending...' : 'Send Offer'}
+                  </button>
+                </div>
               </form>
             )}
 
             {sent && (
               <div className="message-sent-notice">
-                Message sent! Check your Messages tab for replies.
+                {showOfferForm ? 'Offer sent!' : 'Message sent!'} Check your Messages tab for replies.
               </div>
             )}
 
@@ -188,9 +312,11 @@ function ListingDetailModal({
 export function Browse() {
   const { user } = useAuth();
   const [listings, setListings] = useState<ListingWithSeller[]>([]);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedListing, setSelectedListing] = useState<ListingWithSeller | null>(null);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     category: '',
     size: '',
@@ -198,6 +324,7 @@ export function Browse() {
     priceMax: ''
   });
 
+  // Load listings
   useEffect(() => {
     async function loadListings() {
       try {
@@ -213,8 +340,40 @@ export function Browse() {
     loadListings();
   }, []);
 
+  // Load favorites
+  useEffect(() => {
+    if (!user) return;
+    const userId = user.id;
+    async function loadFavorites() {
+      const favs = await fetchFavorites(userId);
+      setFavorites(new Set(favs.map(f => f.id)));
+    }
+    loadFavorites();
+  }, [user]);
+
+  const handleToggleFavorite = async (listingId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (!user) return;
+
+    const isFav = favorites.has(listingId);
+    if (isFav) {
+      await removeFavorite(user.id, listingId);
+      setFavorites(prev => {
+        const next = new Set(prev);
+        next.delete(listingId);
+        return next;
+      });
+    } else {
+      await addFavorite(user.id, listingId);
+      setFavorites(prev => new Set(prev).add(listingId));
+    }
+  };
+
   const filteredListings = useMemo(() => {
     return listings.filter((listing) => {
+      if (showFavoritesOnly && !favorites.has(listing.id)) return false;
       if (filters.category && listing.category !== filters.category) return false;
       if (filters.size && listing.size !== filters.size) return false;
       if (filters.condition && listing.condition !== filters.condition) return false;
@@ -225,7 +384,7 @@ export function Browse() {
       }
       return true;
     });
-  }, [listings, filters]);
+  }, [listings, filters, showFavoritesOnly, favorites]);
 
   const categories = useMemo(() => {
     const cats = new Set(listings.map((l) => l.category));
@@ -258,15 +417,45 @@ export function Browse() {
     );
   };
 
+  const handleMakeOffer = async (amount: number, message: string) => {
+    if (!user || !selectedListing?.seller) return;
+
+    // Format the offer message
+    const offerMessage = `💰 OFFER: $${amount}\n\n${message}`;
+
+    await startConversation(
+      selectedListing.id,
+      user.id,
+      selectedListing.seller.id,
+      offerMessage
+    );
+  };
+
   return (
     <div className="page-content">
       <section>
         <div className="section-header">
-          <h1>Browse Listings</h1>
-          <span>{filteredListings.length} items available</span>
+          <h1>{showFavoritesOnly ? 'Saved Items' : 'Browse Listings'}</h1>
+          <span>{filteredListings.length} items {showFavoritesOnly ? 'saved' : 'available'}</span>
         </div>
 
         <div className="filters-bar">
+          {user && (
+            <div className="view-toggle">
+              <button
+                className={`toggle-btn ${!showFavoritesOnly ? 'active' : ''}`}
+                onClick={() => setShowFavoritesOnly(false)}
+              >
+                All Items
+              </button>
+              <button
+                className={`toggle-btn ${showFavoritesOnly ? 'active' : ''}`}
+                onClick={() => setShowFavoritesOnly(true)}
+              >
+                ♥ Saved ({favorites.size})
+              </button>
+            </div>
+          )}
           <div className="filter-group">
             <label>
               <span>Category</span>
@@ -330,11 +519,15 @@ export function Browse() {
               key={listing.id}
               listing={listing}
               onClick={() => setSelectedListing(listing)}
+              isFavorite={favorites.has(listing.id)}
+              onToggleFavorite={user ? (e) => handleToggleFavorite(listing.id, e) : undefined}
             />
           ))}
           {!loading && filteredListings.length === 0 && !error && (
             <p className="empty-state">
-              {listings.length === 0
+              {showFavoritesOnly
+                ? 'No saved items yet. Browse listings and click the heart to save!'
+                : listings.length === 0
                 ? 'No listings yet. Be the first to add one!'
                 : 'No listings match your filters. Try adjusting them.'}
             </p>
@@ -347,6 +540,9 @@ export function Browse() {
           listing={selectedListing}
           onClose={() => setSelectedListing(null)}
           onContactSeller={handleContactSeller}
+          onMakeOffer={handleMakeOffer}
+          isFavorite={favorites.has(selectedListing.id)}
+          onToggleFavorite={() => handleToggleFavorite(selectedListing.id)}
         />
       )}
     </div>
