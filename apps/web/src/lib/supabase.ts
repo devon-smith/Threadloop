@@ -176,15 +176,19 @@ export async function uploadBase64Image(
   base64Data: string,
   listingId: string
 ): Promise<string | null> {
+  console.log('uploadBase64Image called for listing:', listingId);
+  console.log('Base64 data length:', base64Data.length);
+
   // Extract the base64 content and mime type
   const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
   if (!matches) {
-    console.error('Invalid base64 data format');
+    console.error('Invalid base64 data format. Data starts with:', base64Data.substring(0, 50));
     return null;
   }
 
   const mimeType = matches[1];
   const base64Content = matches[2];
+  console.log('Mime type:', mimeType, 'Base64 content length:', base64Content.length);
 
   // Determine file extension from mime type
   const extMap: Record<string, string> = {
@@ -204,10 +208,12 @@ export async function uploadBase64Image(
   }
   const byteArray = new Uint8Array(byteNumbers);
   const blob = new Blob([byteArray], { type: mimeType });
+  console.log('Blob created, size:', blob.size);
 
   const fileName = `${listingId}/${Date.now()}.${fileExt}`;
+  console.log('Uploading to:', fileName);
 
-  const { error: uploadError } = await supabase.storage
+  const { data: uploadData, error: uploadError } = await supabase.storage
     .from('listing-images')
     .upload(fileName, blob, {
       cacheControl: '3600',
@@ -216,13 +222,17 @@ export async function uploadBase64Image(
     });
 
   if (uploadError) {
-    console.error('Error uploading image:', uploadError);
+    console.error('Error uploading image to Supabase Storage:', uploadError);
+    console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
     return null;
   }
+
+  console.log('Upload successful:', uploadData);
 
   const { data } = supabase.storage
     .from('listing-images')
     .getPublicUrl(fileName);
 
+  console.log('Public URL:', data.publicUrl);
   return data.publicUrl;
 }
