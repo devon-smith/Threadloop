@@ -426,7 +426,13 @@ export async function generateListingSuggestions(
     condition,
     price,
     brand,
-    confidence: categoryResult.confidence
+    confidence: categoryResult.confidence,
+    confidentFields: {
+      title: categoryResult.confidence > 0.8,
+      category: categoryResult.confidence > 0.85,
+      price: categoryResult.confidence > 0.75,
+      description: categoryResult.confidence > 0.7
+    }
   };
 }
 
