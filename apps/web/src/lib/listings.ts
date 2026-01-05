@@ -163,22 +163,18 @@ export async function createListing(input: {
   }
 
   // Then add images - upload base64 to Supabase Storage if needed
-  console.log('Processing images:', input.images.length);
   if (input.images.length > 0) {
     const imageInserts: { listing_id: string; storage_url: string; position: number; quality_score: number | null }[] = [];
 
     for (let index = 0; index < input.images.length; index++) {
       const img = input.images[index];
       let storageUrl = img.storageUrl;
-      console.log(`Image ${index}: URL starts with:`, storageUrl.substring(0, 50));
 
       // If it's a base64 data URL, upload to Supabase Storage
       if (storageUrl.startsWith('data:')) {
-        console.log('Uploading base64 image to storage...');
         const uploadedUrl = await uploadBase64Image(storageUrl, listing.id);
         if (uploadedUrl) {
           storageUrl = uploadedUrl;
-          console.log('Image uploaded successfully:', uploadedUrl);
         } else {
           console.error('Failed to upload image to storage');
           continue; // Skip this image if upload failed
@@ -193,7 +189,6 @@ export async function createListing(input: {
       });
     }
 
-    console.log('Inserting image records:', imageInserts.length);
     if (imageInserts.length > 0) {
       const { error: imageError } = await supabase
         .from('listing_images')
@@ -201,8 +196,6 @@ export async function createListing(input: {
 
       if (imageError) {
         console.error('Error adding listing images:', imageError);
-      } else {
-        console.log('Image records inserted successfully');
       }
     }
   }
