@@ -1,7 +1,9 @@
 // Client-side AI suggestions for listing creation
 // Uses API for Vision-based analysis with Canvas fallback
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.PROD ? `${window.location.origin}/api` : 'http://localhost:4000');
 
 interface AISuggestion {
   title: string;
