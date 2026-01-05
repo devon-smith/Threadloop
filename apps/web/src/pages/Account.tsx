@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT } from '../lib/imageUtils';
+import { createImagePreview, convertHeicToJpeg, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT, isHeicFile } from '../lib/imageUtils';
 
 type UserProfile = {
   displayName: string;
@@ -108,9 +108,16 @@ export function Account() {
       setPhotoPreview(preview);
 
       // Convert file if needed before upload
-      const processedFile = file.type.includes('heic') || file.type.includes('heif') 
-        ? await createImagePreview(file).then(url => fetch(url).then(r => r.blob()).then(blob => new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' })))
-        : file;
+      let processedFile = file;
+      if (isHeicFile(file)) {
+        try {
+          processedFile = await convertHeicToJpeg(file);
+        } catch (conversionError) {
+          console.warn('HEIC conversion failed, trying original file:', conversionError);
+          // If conversion fails, we'll try uploading the original file
+          // though it may not work in all browsers
+        }
+      }
 
       // Upload to Supabase Storage
       const fileExt = processedFile.name.split('.').pop() || 'jpg';
@@ -150,7 +157,14 @@ export function Account() {
 
     } catch (error) {
       console.error('Photo upload error:', error);
-      alert('Failed to upload photo');
+      
+      // Provide more specific error messages for HEIC issues
+      if (error instanceof Error && error.message.includes('HEIC')) {
+        alert(`${error.message}\n\nTip: Try converting the HEIC image to JPEG on your device first, or use a different image format.`);
+      } else {
+        alert('Failed to upload photo. Please try a different image or format.');
+      }
+      
       setPhotoPreview(null);
     } finally {
       setUploadingPhoto(false);
