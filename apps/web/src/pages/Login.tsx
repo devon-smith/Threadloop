@@ -46,8 +46,10 @@ export function Login() {
       return;
     }
 
-    // Store email in sessionStorage for use after SAML callback
+    // Store email in both sessionStorage and localStorage for use after SAML callback
+    // localStorage persists longer in case sessionStorage is cleared
     sessionStorage.setItem('pending_auth_email', trimmedEmail);
+    localStorage.setItem('pending_auth_email', trimmedEmail);
 
     const domain = trimmedEmail.split('@')[1];
     const samlConnection = samlDomains[domain];

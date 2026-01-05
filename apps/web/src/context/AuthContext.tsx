@@ -48,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Auth0 user data:', JSON.stringify(auth0User, null, 2));
 
       // Check for email stored during login flow (for SAML users where IdP doesn't send email)
-      const pendingEmail = sessionStorage.getItem('pending_auth_email');
+      // Check both sessionStorage and localStorage for persistence
+      const pendingEmail = sessionStorage.getItem('pending_auth_email')
+        || localStorage.getItem('pending_auth_email');
 
       // Extract email from various possible locations in Auth0/SAML response
       // Fall back to the email the user entered before SAML redirect
@@ -59,9 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         || pendingEmail
         || '';
 
-      // Clear the pending email after use
+      // Clear the pending email after successful use (but keep in localStorage for future syncs)
       if (pendingEmail) {
         sessionStorage.removeItem('pending_auth_email');
+        // Don't remove from localStorage - we may need it on page reload
       }
 
       // Extract name from various possible locations
