@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 type UserProfile = {
   displayName: string;
@@ -40,6 +41,9 @@ export function Account() {
 
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState(profile);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user || !campus) return;
@@ -73,6 +77,86 @@ export function Account() {
       ...prev,
       measurements: { ...prev.measurements, [field]: e.target.value }
     }));
+  };
+
+  // Handle profile photo file upload
+  const handlePhotoUpload = async (file: File) => {
+    if (!user) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image must be less than 5MB');
+      return;
+    }
+
+    setUploadingPhoto(true);
+
+    try {
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPhotoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload to Supabase Storage
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('listing-images') // Reuse the existing bucket
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        alert('Failed to upload image. Please try again.');
+        setPhotoPreview(null);
+        return;
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('listing-images')
+        .getPublicUrl(fileName);
+
+      // Update form data with new URL
+      setFormData(prev => ({ ...prev, avatarUrl: urlData.publicUrl }));
+
+    } catch (error) {
+      console.error('Photo upload error:', error);
+      alert('Failed to upload photo');
+      setPhotoPreview(null);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handlePhotoUpload(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handlePhotoUpload(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
   };
 
   const handleSave = async () => {
@@ -197,14 +281,49 @@ export function Account() {
               </div>
             ) : (
               <form className="profile-form" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-                <label className="field">
-                  <span>Profile Photo URL</span>
+                {/* Profile Photo Upload */}
+                <div className="field">
+                  <span>Profile Photo</span>
+                  <div
+                    className={`photo-upload-zone ${uploadingPhoto ? 'uploading' : ''}`}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {(photoPreview || formData.avatarUrl) ? (
+                      <div className="photo-preview">
+                        <img
+                          src={photoPreview || formData.avatarUrl}
+                          alt="Profile preview"
+                        />
+                        <div className="photo-overlay">
+                          {uploadingPhoto ? 'Uploading...' : 'Click or drop to change'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="photo-placeholder">
+                        <span className="photo-icon">📷</span>
+                        <span>{uploadingPhoto ? 'Uploading...' : 'Drop photo here or click to upload'}</span>
+                        <span className="photo-hint">JPG, PNG up to 5MB</span>
+                      </div>
+                    )}
+                  </div>
                   <input
-                    value={formData.avatarUrl}
-                    onChange={handleChange('avatarUrl')}
-                    placeholder="https://..."
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
                   />
-                </label>
+                  <div className="photo-url-fallback">
+                    <span>Or paste an image URL:</span>
+                    <input
+                      value={formData.avatarUrl}
+                      onChange={handleChange('avatarUrl')}
+                      placeholder="https://..."
+                    />
+                  </div>
+                </div>
 
                 <label className="field">
                   <span>Display Name</span>

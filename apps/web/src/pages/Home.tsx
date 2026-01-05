@@ -83,23 +83,17 @@ export function Home() {
 
   const campusFeatures = [
     {
+      label: 'No shipping hassles',
+      detail: 'Meet up on campus between classes. No packaging, no postage, no waiting for delivery.'
+    },
+    {
       label: 'Verified students only',
-      detail: 'University SSO + campus ID scanning keeps swaps inside your dorm bubble.'
+      detail: 'University SSO keeps the marketplace safe and trusted within your campus community.'
     },
     {
-      label: 'Locker drop network',
-      detail: 'Pick up at the student center, library pods, or dorm lobby lockers.'
-    },
-    {
-      label: 'Smart matching heatmap',
-      detail: 'See which residence halls want your style before you list.'
+      label: 'AI-powered matching',
+      detail: 'Smart suggestions help you price items right and find buyers who love your style.'
     }
-  ];
-
-  const lockers = [
-    { name: 'Student Center Locker Wall', status: '24/7 access', queue: 'Low' },
-    { name: 'North Quad Lobby Lockers', status: 'Access 8a-11p', queue: 'Med' },
-    { name: 'STEM Library Smart Locker', status: 'Staff assisted', queue: 'Low' }
   ];
 
   return (
@@ -109,7 +103,7 @@ export function Home() {
           <p className="eyebrow">ThreadLoop MVP</p>
           <h1>Swap clothes with your campus in minutes.</h1>
           <p className="lead">
-            Listings are AI-assisted, local, and locker-friendly. Post an item, get instant smart matches, and meet up on your own terms.
+            AI-powered listings, local exchanges, and zero shipping. Post an item, get smart price suggestions, and meet up on your own terms.
           </p>
           <div className="cta-row">
             <button className="cta-primary" onClick={() => navigate('/closet')}>
@@ -131,22 +125,6 @@ export function Home() {
               <article key={feature.label} className="campus-card">
                 <p className="eyebrow">{feature.label}</p>
                 <p>{feature.detail}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="locker-section">
-          <div className="section-header">
-            <h2>Locker drop availability</h2>
-            <span>Reserve a locker when you accept a swap</span>
-          </div>
-          <div className="locker-grid">
-            {lockers.map((locker) => (
-              <article key={locker.name} className="locker-card">
-                <h3>{locker.name}</h3>
-                <p>{locker.status}</p>
-                <span className="pill">Queue: {locker.queue}</span>
               </article>
             ))}
           </div>

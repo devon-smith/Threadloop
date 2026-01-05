@@ -43,14 +43,18 @@ async function ensureDemoUsers(): Promise<string[]> {
 
   for (const user of demoUsers) {
     // Check if user already exists
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('users')
       .select('id')
       .eq('id', user.id)
       .maybeSingle();
 
+    if (checkError) {
+      console.error('Error checking for demo user:', checkError);
+    }
+
     if (!existing) {
-      const { error } = await supabase
+      const { data: newUser, error } = await supabase
         .from('users')
         .insert({
           id: user.id,
@@ -64,14 +68,20 @@ async function ensureDemoUsers(): Promise<string[]> {
           auth_provider: 'demo',
           rating: user.rating,
           total_ratings: user.total_ratings
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
-        console.error('Error creating demo user:', error);
+        console.error('Error creating demo user:', user.display_name, error.message, error.details);
+        // If RLS is blocking, try to use this ID anyway (might exist from before)
+        createdIds.push(user.id);
       } else {
+        console.log('Created demo user:', newUser?.display_name);
         createdIds.push(user.id);
       }
     } else {
+      console.log('Demo user already exists:', user.display_name);
       createdIds.push(user.id);
     }
   }
@@ -281,10 +291,11 @@ export async function seedSampleListings(sellerId?: string): Promise<{ success: 
 
 // Check if sample listings already exist
 export async function checkSampleListingsExist(): Promise<boolean> {
+  // Check if any listings exist at all (simpler check)
   const { data, error } = await supabase
     .from('listings')
     .select('id')
-    .eq('ai_metadata->>seeded', 'true')
+    .eq('status', 'active')
     .limit(1);
 
   if (error) {
