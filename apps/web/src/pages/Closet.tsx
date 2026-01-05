@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { fetchMyListings, createListing, updateListingStatus } from '../lib/listings';
 import { generateListingSuggestions, suggestPrice, getCategoryDemand } from '../lib/aiSuggestions';
 import { seedSampleListings, checkSampleListingsExist } from '../lib/seedListings';
-import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT } from '../lib/imageUtils';
+import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT, isHeicFile } from '../lib/imageUtils';
 
 // Common clothing categories
 const CATEGORIES = [
@@ -172,21 +172,27 @@ function NewListingForm({
     const spotsLeft = MAX_IMAGES - images.length;
     const filesToProcess = Array.from(files).slice(0, spotsLeft);
 
+    // Check for HEIC files early and show helpful message
+    const heicFiles = filesToProcess.filter(isHeicFile);
+    if (heicFiles.length > 0) {
+      setMessage(
+        'HEIC images are not supported by web browsers. Please convert to JPG or PNG first.\n\n' +
+        'On iPhone: Settings → Camera → Formats → "Most Compatible"'
+      );
+      event.target.value = '';
+      return;
+    }
+
     try {
-      // Process each file to handle HEIC conversion
+      // Process each file
       const processedImages = await Promise.all(
         filesToProcess.map(async (file) => {
-          // Validate file type
-          if (!SUPPORTED_IMAGE_TYPES.some(type => file.type.includes(type.split('/')[1]) || file.name.toLowerCase().endsWith(type.split('/')[1]))) {
-            throw new Error(`Unsupported file type: ${file.name}`);
-          }
-
           // Validate file size
           if (file.size > 5 * 1024 * 1024) {
-            throw new Error(`File too large: ${file.name}`);
+            throw new Error(`File too large: ${file.name} (max 5MB)`);
           }
 
-          // Create preview with HEIC conversion
+          // Create preview
           return await createImagePreview(file);
         })
       );

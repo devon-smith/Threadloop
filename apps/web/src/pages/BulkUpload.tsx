@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Listing } from '@threadloop/shared';
 import { calculateDemandScore, getSeasonalInsights, suggestPricing } from '../utils/seasonalDemand';
-import { createImagePreview, convertHeicToJpeg, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT, isHeicFile } from '../lib/imageUtils';
+import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT, isHeicFile } from '../lib/imageUtils';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
@@ -39,45 +39,37 @@ export function BulkUpload() {
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
-    // Process each file to handle HEIC conversion
+    // Check for HEIC files early and reject them with helpful message
+    const heicFiles = files.filter(isHeicFile);
+    if (heicFiles.length > 0) {
+      alert(
+        'HEIC images are not supported by web browsers.\n\n' +
+        'Please convert to JPG or PNG first:\n' +
+        '• On iPhone: Settings → Camera → Formats → "Most Compatible"\n' +
+        '• Or share the image to Files app (auto-converts)'
+      );
+      return;
+    }
+
+    // Process each supported file
     const processedImages = await Promise.all(
       files.map(async (file) => {
         try {
           const preview = await createImagePreview(file);
-          let processedFile = file;
-          
-          // Try to convert HEIC files if needed
-          if (isHeicFile(file)) {
-            try {
-              processedFile = await convertHeicToJpeg(file);
-            } catch (conversionError) {
-              console.warn('HEIC conversion failed, using original file:', conversionError);
-              // Still include the file but mark the conversion error
-              return {
-                id: `${Date.now()}-${Math.random()}`,
-                file: processedFile,
-                originalFile: file,
-                preview,
-                conversionError: conversionError instanceof Error ? conversionError.message : 'HEIC conversion failed'
-              };
-            }
-          }
-          
           return {
             id: `${Date.now()}-${Math.random()}`,
-            file: processedFile,
+            file,
             originalFile: file,
             preview
           };
         } catch (error) {
           console.error(`Error processing file ${file.name}:`, error);
-          // Return null for failed files, filter them out later
           return null;
         }
       })
     );
 
-    // Filter out any failed conversions and add valid images
+    // Filter out any failed files and add valid images
     const validImages = processedImages.filter((img): img is UploadedImage => img !== null) as UploadedImage[];
     setImages(prev => [...prev, ...validImages]);
   }, []);
@@ -86,33 +78,26 @@ export function BulkUpload() {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files);
 
-    // Process each file to handle HEIC conversion
+    // Check for HEIC files early and reject them with helpful message
+    const heicFiles = files.filter(isHeicFile);
+    if (heicFiles.length > 0) {
+      alert(
+        'HEIC images are not supported by web browsers.\n\n' +
+        'Please convert to JPG or PNG first:\n' +
+        '• On iPhone: Settings → Camera → Formats → "Most Compatible"\n' +
+        '• Or share the image to Files app (auto-converts)'
+      );
+      return;
+    }
+
+    // Process each supported file
     const processedImages = await Promise.all(
       files.map(async (file) => {
         try {
           const preview = await createImagePreview(file);
-          let processedFile = file;
-          
-          // Try to convert HEIC files if needed
-          if (isHeicFile(file)) {
-            try {
-              processedFile = await convertHeicToJpeg(file);
-            } catch (conversionError) {
-              console.warn('HEIC conversion failed, using original file:', conversionError);
-              // Still include the file but mark the conversion error
-              return {
-                id: `${Date.now()}-${Math.random()}`,
-                file: processedFile,
-                originalFile: file,
-                preview,
-                conversionError: conversionError instanceof Error ? conversionError.message : 'HEIC conversion failed'
-              };
-            }
-          }
-          
           return {
             id: `${Date.now()}-${Math.random()}`,
-            file: processedFile,
+            file,
             originalFile: file,
             preview
           };
@@ -123,7 +108,7 @@ export function BulkUpload() {
       })
     );
 
-    // Filter out any failed conversions and add valid images
+    // Filter out any failed files and add valid images
     const validImages = processedImages.filter((img): img is UploadedImage => img !== null) as UploadedImage[];
     setImages(prev => [...prev, ...validImages]);
   }, []);

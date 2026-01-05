@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { createImagePreview, convertHeicToJpeg, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT, isHeicFile } from '../lib/imageUtils';
+import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT, isHeicFile } from '../lib/imageUtils';
 
 type UserProfile = {
   displayName: string;
@@ -103,29 +103,29 @@ export function Account() {
     setUploadingPhoto(true);
 
     try {
-      // Create preview with HEIC conversion
+      // Check for HEIC files early and reject with helpful message
+      if (isHeicFile(file)) {
+        alert(
+          'HEIC images are not supported by web browsers.\n\n' +
+          'Please convert to JPG or PNG first:\n' +
+          '• On iPhone: Settings → Camera → Formats → "Most Compatible"\n' +
+          '• Or share the image to Files app (auto-converts)'
+        );
+        setUploadingPhoto(false);
+        return;
+      }
+
+      // Create preview
       const preview = await createImagePreview(file);
       setPhotoPreview(preview);
 
-      // Convert file if needed before upload
-      let processedFile = file;
-      if (isHeicFile(file)) {
-        try {
-          processedFile = await convertHeicToJpeg(file);
-        } catch (conversionError) {
-          console.warn('HEIC conversion failed, trying original file:', conversionError);
-          // If conversion fails, we'll try uploading the original file
-          // though it may not work in all browsers
-        }
-      }
-
       // Upload to Supabase Storage
-      const fileExt = processedFile.name.split('.').pop() || 'jpg';
+      const fileExt = file.name.split('.').pop() || 'jpg';
       const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('listing-images') // Reuse the existing bucket
-        .upload(fileName, processedFile, {
+        .upload(fileName, file, {
           cacheControl: '3600',
           upsert: true
         });
