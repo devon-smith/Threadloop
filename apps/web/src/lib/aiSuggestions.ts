@@ -1,5 +1,7 @@
 // Client-side AI suggestions for listing creation
-// Uses Canvas API for actual image color analysis
+// Uses API for Vision-based analysis with Canvas fallback
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 interface AISuggestion {
   title: string;
@@ -385,37 +387,60 @@ export async function generateListingSuggestions(
   filename?: string,
   userHints?: { category?: string; brand?: string; size?: string }
 ): Promise<AISuggestion> {
-  // Analyze image colors using Canvas
+  // Try API-based Vision analysis first
+  try {
+    const response = await fetch(`${API_BASE_URL}/ai/listing-suggestions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        imageData,
+        category: userHints?.category,
+        size: userHints?.size
+      })
+    });
+
+    if (response.ok) {
+      const payload = await response.json();
+      if (payload.success && payload.data) {
+        const data = payload.data;
+        const confidence = data.aiMetadata?.confidence || 0.8;
+        
+        return {
+          title: data.title || 'Clothing Item',
+          description: data.description || '',
+          category: data.category || userHints?.category || 'Other',
+          size: data.size || userHints?.size || 'M',
+          condition: data.condition || 'good',
+          price: data.price || estimatePrice(data.category, data.condition, userHints?.brand),
+          brand: userHints?.brand,
+          confidence,
+          confidentFields: {
+            title: confidence > 0.7,
+            category: confidence > 0.75,
+            price: confidence > 0.6,
+            description: confidence > 0.6
+          }
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('API AI analysis failed, falling back to client-side:', error);
+  }
+
+  // Fallback: Client-side Canvas analysis
   const colors = await analyzeImageColors(imageData);
   const primaryColor = colors[0] || 'gray';
-
-  // Analyze image shape
   const shapeInfo = await analyzeImageShape(imageData);
-
-  // Detect category and item type
   const categoryResult = await detectCategory(filename, colors, shapeInfo.aspectRatio);
 
-  // Use user-provided category if available
   const category = userHints?.category || categoryResult.category;
   const itemType = categoryResult.itemType;
   const categoryInfo = CATEGORY_HINTS[category] || CATEGORY_HINTS['Other'];
-
-  // Use provided brand or none
   const brand = userHints?.brand;
-
-  // Infer condition (default to 'good' for user uploads)
   const condition = 'good' as const;
-
-  // Generate title with actual detected color
   const title = generateTitle(itemType, primaryColor, brand);
-
-  // Generate description
   const description = generateDescription(category, itemType, condition, primaryColor, brand);
-
-  // Estimate price
   const price = estimatePrice(category, condition, brand);
-
-  // Get size
   const size = userHints?.size || categoryInfo.defaultSize;
 
   return {

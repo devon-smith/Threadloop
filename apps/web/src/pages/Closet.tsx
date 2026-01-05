@@ -171,6 +171,7 @@ function NewListingForm({
     // Check how many more images we can add
     const spotsLeft = MAX_IMAGES - images.length;
     const filesToProcess = Array.from(files).slice(0, spotsLeft);
+    const isFirstImage = images.length === 0;
 
     try {
       // Process each file (HEIC files are converted via server-side API)
@@ -188,6 +189,13 @@ function NewListingForm({
 
       setImages(prev => [...prev, ...processedImages]);
       setMessage(null);
+
+      // Trigger AI auto-fill on first image upload
+      if (isFirstImage && processedImages.length > 0 && !aiSuggested) {
+        const firstImage = processedImages[0];
+        const filename = filesToProcess[0]?.name;
+        processWithAI(firstImage, filename);
+      }
     } catch (error) {
       console.error('Error processing images:', error);
       setMessage(error instanceof Error ? error.message : 'Failed to process images');
