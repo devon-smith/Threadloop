@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT } from '../lib/imageUtils';
 
 type UserProfile = {
   displayName: string;
@@ -88,8 +89,8 @@ export function Account() {
     if (!user) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+    if (!SUPPORTED_IMAGE_TYPES.some(type => file.type.includes(type.split('/')[1]) || file.name.toLowerCase().endsWith(type.split('/')[1]))) {
+      alert(`Please upload an image file (${SUPPORTED_FORMATS_TEXT})`);
       return;
     }
 
@@ -102,20 +103,22 @@ export function Account() {
     setUploadingPhoto(true);
 
     try {
-      // Create preview
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPhotoPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+      // Create preview with HEIC conversion
+      const preview = await createImagePreview(file);
+      setPhotoPreview(preview);
+
+      // Convert file if needed before upload
+      const processedFile = file.type.includes('heic') || file.type.includes('heif') 
+        ? await createImagePreview(file).then(url => fetch(url).then(r => r.blob()).then(blob => new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' })))
+        : file;
 
       // Upload to Supabase Storage
-      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileExt = processedFile.name.split('.').pop() || 'jpg';
       const fileName = `${user.id}/avatar-${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('listing-images') // Reuse the existing bucket
-        .upload(fileName, file, {
+        .upload(fileName, processedFile, {
           cacheControl: '3600',
           upsert: true
         });
@@ -253,7 +256,7 @@ export function Account() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept={SUPPORTED_IMAGE_TYPES.join(',')}
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
               />
@@ -340,14 +343,14 @@ export function Account() {
                       <div className="photo-placeholder">
                         <span className="photo-icon">📷</span>
                         <span>{uploadingPhoto ? 'Uploading...' : 'Drop photo here or click to upload'}</span>
-                        <span className="photo-hint">JPG, PNG up to 5MB</span>
+                        <span className="photo-hint">{SUPPORTED_FORMATS_TEXT} up to 5MB</span>
                       </div>
                     )}
                   </div>
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept={SUPPORTED_IMAGE_TYPES.join(',')}
                     onChange={handleFileSelect}
                     style={{ display: 'none' }}
                   />

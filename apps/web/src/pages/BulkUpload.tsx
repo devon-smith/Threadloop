@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Listing } from '@threadloop/shared';
 import { calculateDemandScore, getSeasonalInsights, suggestPricing } from '../utils/seasonalDemand';
+import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT } from '../lib/imageUtils';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ??
@@ -33,31 +34,56 @@ export function BulkUpload() {
   const [isUrgentSale, setIsUrgentSale] = useState(false);
   const seasonalInsights = getSeasonalInsights();
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
-    const newImages: UploadedImage[] = files.map(file => ({
-      id: `${Date.now()}-${Math.random()}`,
-      file,
-      preview: URL.createObjectURL(file)
-    }));
+    // Process each file to handle HEIC conversion
+    const processedImages = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const preview = await createImagePreview(file);
+          return {
+            id: `${Date.now()}-${Math.random()}`,
+            file,
+            preview
+          };
+        } catch (error) {
+          console.error(`Error processing file ${file.name}:`, error);
+          // Return null for failed files, filter them out later
+          return null;
+        }
+      })
+    );
 
-    setImages(prev => [...prev, ...newImages]);
+    // Filter out any failed conversions and add valid images
+    const validImages = processedImages.filter((img): img is UploadedImage => img !== null);
+    setImages(prev => [...prev, ...validImages]);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files);
 
-    const newImages: UploadedImage[] = files
-      .filter(file => file.type.startsWith('image/'))
-      .map(file => ({
-        id: `${Date.now()}-${Math.random()}`,
-        file,
-        preview: URL.createObjectURL(file)
-      }));
+    // Process each file to handle HEIC conversion
+    const processedImages = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const preview = await createImagePreview(file);
+          return {
+            id: `${Date.now()}-${Math.random()}`,
+            file,
+            preview
+          };
+        } catch (error) {
+          console.error(`Error processing file ${file.name}:`, error);
+          return null;
+        }
+      })
+    );
 
-    setImages(prev => [...prev, ...newImages]);
+    // Filter out any failed conversions and add valid images
+    const validImages = processedImages.filter((img): img is UploadedImage => img !== null);
+    setImages(prev => [...prev, ...validImages]);
   }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -238,7 +264,7 @@ export function BulkUpload() {
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept={SUPPORTED_IMAGE_TYPES.join(',')}
               onChange={handleFileChange}
               className="file-input"
             />
