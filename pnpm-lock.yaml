@@ -93,6 +93,9 @@ importers:
       '@auth0/auth0-react':
         specifier: ^2.11.0
         version: 2.11.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@google-cloud/vision':
+        specifier: ^5.3.4
+        version: 5.3.4
       '@supabase/supabase-js':
         specifier: ^2.89.0
         version: 2.89.0

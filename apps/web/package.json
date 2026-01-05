@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.11.0",
+    "@google-cloud/vision": "^5.3.4",
     "@supabase/supabase-js": "^2.89.0",
     "@threadloop/shared": "workspace:*",
     "heic-convert": "^2.1.0",
