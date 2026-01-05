@@ -1,6 +1,6 @@
 // AI model for predicting clothing attributes from image features
 
-import type { ClothingAttributes, ClothingCategory } from './clothingTaxonomy';
+import type { ClothingAttributes, ClothingCategory, Material, Pattern, StyleVibe, Occasion } from './clothingTaxonomy';
 import { generateStandardizedDescription, standardizeSize, CATEGORY_ATTRIBUTES } from './clothingTaxonomy';
 import { findSimilarExamples } from './syntheticTrainingData';
 import type { ImageFeatures } from './imageFeatureExtractor';
@@ -75,6 +75,46 @@ export async function predictAttributes(
 
   // Calculate overall confidence
   const confidence = calculateConfidence(imageFeatures, similarExamples);
+
+  // Check if we should auto-fill or return minimal data
+  const canAutoFill = shouldAutoFill(confidence, imageFeatures.detectedObjects);
+  
+  if (!canAutoFill) {
+    // Return minimal prediction when confidence is low
+    const processingTime = Date.now() - startTime;
+    return {
+      attributes: {
+        category: 'Bottoms' as ClothingCategory, // Default to most common
+        subcategory: undefined,
+        fit: undefined,
+        neckline: undefined,
+        sleeveLength: undefined,
+        length: undefined,
+        material: 'cotton' as Material,
+        pattern: 'solid' as Pattern,
+        primaryColor: inferPrimaryColor(imageFeatures.dominantColors),
+        secondaryColor: imageFeatures.dominantColors.length > 1 ?
+          inferSecondaryColor(imageFeatures.dominantColors) : undefined,
+        styleVibe: ['casual'] as StyleVibe[],
+        occasion: ['everyday'] as Occasion[],
+        season: ['spring', 'summer', 'fall', 'winter'],
+        features: []
+      },
+      title: 'Item Description',
+      description: 'Please manually describe this item.',
+      category: 'Bottoms' as ClothingCategory,
+      size: userHints?.size || 'M',
+      condition: 'good',
+      price: undefined,
+      confidence,
+      aiMetadata: {
+        detectedColors: imageFeatures.dominantColors,
+        detectedObjects: imageFeatures.detectedObjects,
+        modelVersion: 'v1.0-synthetic',
+        processingTime
+      }
+    };
+  }
 
   const processingTime = Date.now() - startTime;
 
@@ -346,4 +386,17 @@ function calculateConfidence(imageFeatures: ImageFeatures, similarExamples: any[
     sum + ex.metadata.confidence, 0) / similarExamples.length;
 
   return Math.min(0.99, (baseConfidence + avgSimilarityConfidence) / 2);
+}
+
+// Only auto-fill if we have high confidence in the prediction
+function shouldAutoFill(confidence: number, detectedObjects: string[]): boolean {
+  // Require higher confidence for auto-fill
+  if (confidence < 0.85) return false;
+  
+  // Require clear object detection for category classification
+  const hasClearObjects = detectedObjects.some(obj => 
+    ['clothing', 'pants', 'shirt', 'dress', 'jacket', 'sweater', 'skirt', 'shorts'].includes(obj)
+  );
+  
+  return hasClearObjects;
 }

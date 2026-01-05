@@ -66,6 +66,10 @@ export function Account() {
 
     setProfile(nextProfile);
     setFormData(nextProfile);
+    // Only reset photo preview if there's no avatar URL
+    if (!user.avatarUrl) {
+      setPhotoPreview(null);
+    }
   }, [user, campus]);
 
   const handleChange = (field: keyof UserProfile) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -128,8 +132,18 @@ export function Account() {
         .from('listing-images')
         .getPublicUrl(fileName);
 
+      const newAvatarUrl = urlData.publicUrl;
+
       // Update form data with new URL
-      setFormData(prev => ({ ...prev, avatarUrl: urlData.publicUrl }));
+      setFormData(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
+
+      // If not in editing mode, save directly to profile
+      if (!editing) {
+        await updateProfile({ avatarUrl: newAvatarUrl });
+        setProfile(prev => ({ ...prev, avatarUrl: newAvatarUrl }));
+        // Clear photo preview after successful upload
+        setPhotoPreview(null);
+      }
 
     } catch (error) {
       console.error('Photo upload error:', error);
@@ -179,6 +193,8 @@ export function Account() {
     });
 
     setProfile(formData);
+    // Clear photo preview after successful save
+    setPhotoPreview(null);
     setEditing(false);
   };
 
@@ -211,13 +227,36 @@ export function Account() {
         <div className="account-container">
           <div className="profile-card">
             <div className="profile-header">
-              <div className="avatar">
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={profile.displayName} />
+              <div
+                className={`avatar avatar-upload ${uploadingPhoto ? 'uploading' : ''}`}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onClick={() => fileInputRef.current?.click()}
+                title="Click or drop image to change photo"
+              >
+                {(photoPreview || profile.avatarUrl) ? (
+                  <>
+                    <img src={photoPreview || profile.avatarUrl} alt={profile.displayName} />
+                    <div className="avatar-overlay">
+                      {uploadingPhoto ? 'Uploading...' : 'Change'}
+                    </div>
+                  </>
                 ) : (
-                  profile.displayName.charAt(0).toUpperCase()
+                  <div className="avatar-placeholder">
+                    <span className="avatar-initial">{profile.displayName.charAt(0).toUpperCase()}</span>
+                    <div className="avatar-overlay">
+                      {uploadingPhoto ? 'Uploading...' : 'Add photo'}
+                    </div>
+                  </div>
                 )}
               </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
               <div className="profile-stats">
                 <h2>{profile.displayName}</h2>
                 <p className="meta">{profile.email}</p>
@@ -231,9 +270,6 @@ export function Account() {
                     <span className="stat-label">Swaps</span>
                   </div>
                 </div>
-                <button className="ghost" onClick={() => setEditing(true)}>
-                  {profile.avatarUrl ? 'Change profile photo' : 'Add profile photo'}
-                </button>
               </div>
             </div>
 
