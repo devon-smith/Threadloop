@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import vision from '@google-cloud/vision';
 
 // Category mappings from Vision API labels
 const CATEGORY_LABEL_MAP: Record<string, { category: string; subcategory: string }> = {
@@ -22,6 +21,7 @@ const CATEGORY_LABEL_MAP: Record<string, { category: string; subcategory: string
   'hoodie': { category: 'Outerwear', subcategory: 'hoodie' },
   'cardigan': { category: 'Outerwear', subcategory: 'cardigan' },
   'sweater': { category: 'Outerwear', subcategory: 'sweater' },
+  'outerwear': { category: 'Outerwear', subcategory: 'jacket' },
   'shoe': { category: 'Footwear', subcategory: 'shoes' },
   'shoes': { category: 'Footwear', subcategory: 'shoes' },
   'sneakers': { category: 'Footwear', subcategory: 'sneakers' },
@@ -79,6 +79,34 @@ function detectCategory(labels: Array<{ description: string; score: number }>) {
   return bestMatch;
 }
 
+// Use REST API directly instead of client library (works better on serverless)
+async function callVisionAPI(apiKey: string, base64Image: string) {
+  const response = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: base64Image },
+          features: [
+            { type: 'LABEL_DETECTION', maxResults: 20 },
+            { type: 'IMAGE_PROPERTIES' }
+          ]
+        }]
+      })
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Vision API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.responses?.[0] || {};
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -90,10 +118,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ success: false, error: 'Provide imageData' });
   }
 
-  // Check for API key
   const apiKey = process.env.GOOGLE_CLOUD_API_KEY;
   if (!apiKey) {
-    // Fallback to stub if no API key
     return res.status(200).json({
       success: true,
       data: {
@@ -109,8 +135,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const client = new vision.ImageAnnotatorClient({ apiKey });
-
     // Extract base64 from data URL
     let base64Data = imageData;
     if (imageData.startsWith('data:')) {
@@ -118,16 +142,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (matches) base64Data = matches[1];
     }
 
-    const [result] = await client.annotateImage({
-      image: { content: base64Data },
-      features: [
-        { type: 'LABEL_DETECTION', maxResults: 20 },
-        { type: 'IMAGE_PROPERTIES' }
-      ]
-    });
+    const result = await callVisionAPI(apiKey, base64Data);
 
     // Process labels
-    const labels = (result.labelAnnotations || []).map((l: { description?: string | null; score?: number | null }) => ({
+    const labels = (result.labelAnnotations || []).map((l: { description?: string; score?: number }) => ({
       description: l.description || '',
       score: l.score || 0
     }));
@@ -135,7 +153,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Process colors
     const dominantColors = result.imagePropertiesAnnotation?.dominantColors?.colors || [];
-    const sortedColors = [...dominantColors].sort((a, b) => (b.pixelFraction || 0) - (a.pixelFraction || 0));
+    const sortedColors = [...dominantColors].sort((a: { pixelFraction?: number }, b: { pixelFraction?: number }) => 
+      (b.pixelFraction || 0) - (a.pixelFraction || 0)
+    );
     let primaryColor = 'gray';
     if (sortedColors.length > 0 && sortedColors[0].color) {
       const c = sortedColors[0].color;
@@ -170,6 +190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error('Vision API error:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     return res.status(200).json({
       success: true,
       data: {
@@ -179,7 +200,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         size: hintSize || 'M',
         condition: 'good',
         price: 25,
-        aiMetadata: { source: 'fallback-error', confidence: 0.5 }
+        aiMetadata: { source: 'fallback-error', error: errorMsg, confidence: 0.5 }
       }
     });
   }
