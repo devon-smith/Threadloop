@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import sharp from 'sharp';
+import convert from 'heic-convert';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST requests
@@ -32,20 +32,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Convert base64 to buffer
     const imageBuffer = Buffer.from(base64Data, 'base64');
 
-    // Use sharp to convert to JPEG
-    // Sharp automatically detects HEIC/HEIF and other formats
-    const jpegBuffer = await sharp(imageBuffer)
-      .jpeg({
-        quality: 85,
-        mozjpeg: true
-      })
-      .toBuffer();
-
-    // Get image metadata for response
-    const metadata = await sharp(jpegBuffer).metadata();
+    // Use heic-convert to convert to JPEG (pure JavaScript, works on Vercel)
+    const jpegBuffer = await convert({
+      buffer: imageBuffer,
+      format: 'JPEG',
+      quality: 0.85
+    });
 
     // Convert back to base64 data URL
-    const jpegBase64 = `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`;
+    const jpegBase64 = `data:image/jpeg;base64,${Buffer.from(jpegBuffer).toString('base64')}`;
 
     // Generate new filename
     const newFilename = filename 
@@ -57,9 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data: {
         imageData: jpegBase64,
         filename: newFilename,
-        width: metadata.width,
-        height: metadata.height,
-        size: jpegBuffer.length,
+        size: jpegBuffer.byteLength,
         originalMimeType: mimeType,
         convertedMimeType: 'image/jpeg'
       }
@@ -73,9 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({
       success: false,
       error: 'Failed to convert image',
-      details: errorMessage.includes('heif') || errorMessage.includes('Input buffer')
-        ? 'The image format could not be processed. Please try a different image.'
-        : errorMessage
+      details: errorMessage
     });
   }
 }
