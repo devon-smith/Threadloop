@@ -4,12 +4,19 @@
 interface AISuggestion {
   title: string;
   description: string;
-  category: string;
-  size: string;
+  category: string;  // Empty string if uncertain
+  size: string;      // Empty string if uncertain
   condition: 'new' | 'like_new' | 'good' | 'fair';
-  price: number;
+  price: number;     // 0 if uncertain
   brand?: string;
   confidence: number;
+  // Track which fields we're confident about
+  confidentFields: {
+    title: boolean;
+    category: boolean;
+    price: boolean;
+    description: boolean;
+  };
 }
 
 // Clothing categories with typical attributes
