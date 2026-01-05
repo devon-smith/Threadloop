@@ -27,6 +27,17 @@ const CLOTHING_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
 // Shoe sizes
 const SHOE_SIZES = ['5', '5.5', '6', '6.5', '7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '13', '14'];
 
+// Pants waist sizes
+const WAIST_SIZES = ['26', '27', '28', '29', '30', '31', '32', '33', '34', '36', '38', '40', '42'];
+
+// Pants length sizes
+const LENGTH_SIZES = ['28', '29', '30', '31', '32', '33', '34', '36'];
+
+// Check if category uses waist/length sizing
+const usesPantsSizing = (category: string) => {
+  return category === 'Bottoms';
+};
+
 // Helper to get sizes based on category
 const getSizesForCategory = (category: string) => {
   if (category === 'Shoes' || category === 'Footwear') {
@@ -105,6 +116,8 @@ function NewListingForm({
     description: string;
     category: string;
     size: string;
+    waist: string;
+    length: string;
     condition: 'new' | 'like_new' | 'good' | 'fair';
     price: string;
     swapValue: string;
@@ -114,6 +127,8 @@ function NewListingForm({
     description: '',
     category: 'Tops',
     size: 'M',
+    waist: '32',
+    length: '32',
     condition: 'like_new',
     price: '',
     swapValue: '',
@@ -251,13 +266,18 @@ function NewListingForm({
     setMessage(null);
 
     try {
+      // Combine waist/length for pants sizing
+      const finalSize = usesPantsSizing(form.category) 
+        ? `${form.waist}x${form.length}` 
+        : form.size;
+
       const listing = await createListing({
         sellerId: userId,
         campusId: campusId,
         title: form.title.trim(),
         description: form.description.trim() || 'No description provided.',
         category: form.category,
-        size: form.size,
+        size: finalSize,
         condition: form.condition,
         brand: form.brand.trim() || undefined,
         price: form.price ? Number(form.price) : undefined,
@@ -375,14 +395,35 @@ function NewListingForm({
             </select>
           </div>
 
-          <div className="field">
-            <label htmlFor="size">Size</label>
-            <select id="size" value={form.size} onChange={handleChange('size')}>
-              {getSizesForCategory(form.category).map((size: string) => (
-                <option key={size} value={size}>{size}</option>
-              ))}
-            </select>
-          </div>
+          {usesPantsSizing(form.category) ? (
+            <>
+              <div className="field">
+                <label htmlFor="waist">Waist</label>
+                <select id="waist" value={form.waist} onChange={handleChange('waist')}>
+                  {WAIST_SIZES.map((size: string) => (
+                    <option key={size} value={size}>{size}"</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="length">Length</label>
+                <select id="length" value={form.length} onChange={handleChange('length')}>
+                  {LENGTH_SIZES.map((size: string) => (
+                    <option key={size} value={size}>{size}"</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <div className="field">
+              <label htmlFor="size">Size</label>
+              <select id="size" value={form.size} onChange={handleChange('size')}>
+                {getSizesForCategory(form.category).map((size: string) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="field">
             <label htmlFor="condition">Condition</label>
