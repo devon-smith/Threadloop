@@ -7,6 +7,7 @@ import healthRoute from './routes/health';
 import listingsRoute from './routes/listings';
 import aiRoute from './routes/ai';
 import authRoute from './routes/auth';
+import imagesRoute from './routes/images';
 
 validateConfig();
 
@@ -23,6 +24,7 @@ app.use('/health', healthRoute);
 app.use('/auth', authRoute);
 app.use('/listings', listingsRoute);
 app.use('/ai', aiRoute);
+app.use('/images', imagesRoute);
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

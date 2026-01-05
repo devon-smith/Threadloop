@@ -192,7 +192,7 @@ router.get('/campuses', (req, res) => {
 
   return res.json({
     success: true,
-    data: CAMPUSES.map(c => ({
+    data: CAMPUSES.map((c: { id: string; name: string; emailDomains: string[]; location: string }) => ({
       id: c.id,
       name: c.name,
       emailDomains: c.emailDomains,

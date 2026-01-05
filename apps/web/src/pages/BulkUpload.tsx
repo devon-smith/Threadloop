@@ -39,19 +39,7 @@ export function BulkUpload() {
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
-    // Check for HEIC files early and reject them with helpful message
-    const heicFiles = files.filter(isHeicFile);
-    if (heicFiles.length > 0) {
-      alert(
-        'HEIC images are not supported by web browsers.\n\n' +
-        'Please convert to JPG or PNG first:\n' +
-        '• On iPhone: Settings → Camera → Formats → "Most Compatible"\n' +
-        '• Or share the image to Files app (auto-converts)'
-      );
-      return;
-    }
-
-    // Process each supported file
+    // Process each file (HEIC files are converted via server-side API)
     const processedImages = await Promise.all(
       files.map(async (file) => {
         try {
@@ -78,19 +66,7 @@ export function BulkUpload() {
     e.preventDefault();
     const files = Array.from(e.dataTransfer.files);
 
-    // Check for HEIC files early and reject them with helpful message
-    const heicFiles = files.filter(isHeicFile);
-    if (heicFiles.length > 0) {
-      alert(
-        'HEIC images are not supported by web browsers.\n\n' +
-        'Please convert to JPG or PNG first:\n' +
-        '• On iPhone: Settings → Camera → Formats → "Most Compatible"\n' +
-        '• Or share the image to Files app (auto-converts)'
-      );
-      return;
-    }
-
-    // Process each supported file
+    // Process each file (HEIC files are converted via server-side API)
     const processedImages = await Promise.all(
       files.map(async (file) => {
         try {

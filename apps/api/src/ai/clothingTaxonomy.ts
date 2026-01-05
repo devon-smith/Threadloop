@@ -38,6 +38,7 @@ export type SleeveLength =
   | 'long';
 
 export type Length =
+  | 'mini'
   | 'cropped'
   | 'hip'
   | 'mid-thigh'

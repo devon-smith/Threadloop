@@ -18,7 +18,7 @@ const listingSchema = zod_1.z.object({
     condition: zod_1.z.enum(['new', 'like_new', 'good', 'fair']),
     price: zod_1.z.number().optional(),
     swapValue: zod_1.z.number().optional(),
-    status: zod_1.z.enum(['active', 'reserved', 'completed', 'cancelled']).default('active'),
+    status: zod_1.z.enum(['active', 'reserved', 'sold', 'swapped', 'cancelled']).default('active'),
     aiMetadata: zod_1.z.record(zod_1.z.unknown()).optional(),
     images: zod_1.z
         .array(zod_1.z.object({

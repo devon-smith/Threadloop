@@ -172,19 +172,8 @@ function NewListingForm({
     const spotsLeft = MAX_IMAGES - images.length;
     const filesToProcess = Array.from(files).slice(0, spotsLeft);
 
-    // Check for HEIC files early and show helpful message
-    const heicFiles = filesToProcess.filter(isHeicFile);
-    if (heicFiles.length > 0) {
-      setMessage(
-        'HEIC images are not supported by web browsers. Please convert to JPG or PNG first.\n\n' +
-        'On iPhone: Settings → Camera → Formats → "Most Compatible"'
-      );
-      event.target.value = '';
-      return;
-    }
-
     try {
-      // Process each file
+      // Process each file (HEIC files are converted via server-side API)
       const processedImages = await Promise.all(
         filesToProcess.map(async (file) => {
           // Validate file size
@@ -192,7 +181,7 @@ function NewListingForm({
             throw new Error(`File too large: ${file.name} (max 5MB)`);
           }
 
-          // Create preview
+          // Create preview (handles HEIC conversion automatically)
           return await createImagePreview(file);
         })
       );

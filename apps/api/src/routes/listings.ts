@@ -22,7 +22,7 @@ const listingSchema = z.object({
   condition: z.enum(['new', 'like_new', 'good', 'fair']),
   price: z.number().optional(),
   swapValue: z.number().optional(),
-  status: z.enum(['active', 'reserved', 'completed', 'cancelled']).default('active'),
+  status: z.enum(['active', 'reserved', 'sold', 'swapped', 'cancelled']).default('active'),
   aiMetadata: z.record(z.unknown()).optional(),
   images: z
     .array(

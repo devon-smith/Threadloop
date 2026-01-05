@@ -2,65 +2,60 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const zod_1 = require("zod");
+const imageFeatureExtractor_1 = require("../ai/imageFeatureExtractor");
+const attributePredictor_1 = require("../ai/attributePredictor");
 const router = (0, express_1.Router)();
 const requestSchema = zod_1.z
     .object({
     imageData: zod_1.z.string().min(20).optional(),
-    imageUrl: zod_1.z.string().url().optional()
+    imageUrl: zod_1.z.string().url().optional(),
+    category: zod_1.z.string().optional(),
+    size: zod_1.z.string().optional()
 })
     .refine((value) => Boolean(value.imageData) || Boolean(value.imageUrl), {
     message: 'Provide imageData or imageUrl'
 });
-const suggestionLibrary = [
-    {
-        title: 'Coastal Cowgirl Denim Set',
-        description: 'Light-wash denim maxi skirt with matching cropped jacket. Easy to pair with boots or sneakers.',
-        category: 'Sets',
-        size: 'M',
-        condition: 'like_new',
-        price: 70,
-        aiMetadata: { palette: ['indigo', 'sand'], vibe: 'coastal cowgirl' }
-    },
-    {
-        title: 'Black Satin Slip Dress',
-        description: 'Bias-cut midi with adjustable straps. Works layered over tees for class or dressed up for nights out.',
-        category: 'Dresses',
-        size: 'S',
-        condition: 'good',
-        swapValue: 60,
-        aiMetadata: { tags: ['minimalist', 'night-out'], occasions: ['formal', 'party'] }
-    },
-    {
-        title: 'Varsity Knit + Cargo Mini',
-        description: 'Chunky striped sweater paired with sage cargo mini skirt. Perfect for fall gameday layers.',
-        category: 'Bundle',
-        size: 'M',
-        condition: 'like_new',
-        price: 55,
-        aiMetadata: { recommendedMatches: ['white platform sneakers'], vibe: 'preppy streetwear' }
-    },
-    {
-        title: 'Nike Air Force 1 Shadow',
-        description: 'Cream and pastel AF1 Shadow with double swooshes. Slight creasing but plenty of wear left.',
-        category: 'Footwear',
-        size: 'W8.5 / M7',
-        condition: 'good',
-        price: 85,
-        aiMetadata: { palette: ['cream', 'lavender'], tags: ['sneakers'] }
-    }
-];
-router.post('/listing-suggestions', (req, res) => {
+// Enhanced AI-powered listing suggestions
+router.post('/listing-suggestions', async (req, res) => {
     const parsed = requestSchema.safeParse(req.body);
     if (!parsed.success) {
         return res.status(400).json({ success: false, error: parsed.error.flatten() });
     }
-    const suggestion = suggestionLibrary[Math.floor(Math.random() * suggestionLibrary.length)];
-    return res.json({
-        success: true,
-        data: {
-            ...suggestion,
-            confidence: 0.72
-        }
-    });
+    try {
+        const { imageData, imageUrl, category, size } = parsed.data;
+        // Extract image features
+        const imageFeatures = imageData
+            ? await (0, imageFeatureExtractor_1.extractImageFeatures)(imageData)
+            : await (0, imageFeatureExtractor_1.extractImageFeaturesFromUrl)(imageUrl);
+        // Predict attributes using AI model
+        const prediction = await (0, attributePredictor_1.predictAttributes)(imageFeatures, {
+            category: category,
+            size
+        });
+        // Return standardized listing suggestion
+        return res.json({
+            success: true,
+            data: {
+                title: prediction.title,
+                description: prediction.description,
+                category: prediction.category,
+                size: prediction.size,
+                condition: prediction.condition,
+                price: prediction.price,
+                aiMetadata: {
+                    attributes: prediction.attributes,
+                    ...prediction.aiMetadata,
+                    confidence: prediction.confidence
+                }
+            }
+        });
+    }
+    catch (error) {
+        console.error('AI prediction error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'AI processing failed. Please try again.'
+        });
+    }
 });
 exports.default = router;

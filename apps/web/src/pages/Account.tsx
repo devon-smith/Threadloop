@@ -103,19 +103,7 @@ export function Account() {
     setUploadingPhoto(true);
 
     try {
-      // Check for HEIC files early and reject with helpful message
-      if (isHeicFile(file)) {
-        alert(
-          'HEIC images are not supported by web browsers.\n\n' +
-          'Please convert to JPG or PNG first:\n' +
-          '• On iPhone: Settings → Camera → Formats → "Most Compatible"\n' +
-          '• Or share the image to Files app (auto-converts)'
-        );
-        setUploadingPhoto(false);
-        return;
-      }
-
-      // Create preview
+      // Create preview (handles HEIC conversion via server-side API)
       const preview = await createImagePreview(file);
       setPhotoPreview(preview);
 
