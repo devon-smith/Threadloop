@@ -30,6 +30,7 @@ export type DbUser = {
   favorite_colors: string[];
   sizing_profile: Record<string, string>;
   settings: Record<string, boolean>;
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 };

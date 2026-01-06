@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Listing } from '@threadloop/shared';
-import { fetchListings, fetchFavorites, addFavorite, removeFavorite } from '../lib/listings';
+import { fetchListings, fetchFavorites, addFavorite, removeFavorite, deleteListing } from '../lib/listings';
 import { startConversation } from '../lib/messages';
 import { useAuth } from '../context/AuthContext';
 
@@ -88,7 +88,8 @@ function ListingDetailModal({
   onContactSeller,
   onMakeOffer,
   isFavorite,
-  onToggleFavorite
+  onToggleFavorite,
+  onAdminDelete
 }: {
   listing: ListingWithSeller;
   onClose: () => void;
@@ -96,6 +97,7 @@ function ListingDetailModal({
   onMakeOffer: (amount: number, message: string) => Promise<void>;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  onAdminDelete?: () => void;
 }) {
   const { user } = useAuth();
   const [message, setMessage] = useState('');
@@ -104,8 +106,10 @@ function ListingDetailModal({
   const [showOfferForm, setShowOfferForm] = useState(false);
   const [offerAmount, setOfferAmount] = useState(listing.price?.toString() || '');
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isOwnListing = user?.id === listing.sellerId;
+  const isAdmin = user?.isAdmin === true;
   const hasMultipleImages = listing.images && listing.images.length > 1;
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -294,6 +298,31 @@ function ListingDetailModal({
             {isOwnListing && (
               <div className="own-listing-notice">
                 This is your listing
+              </div>
+            )}
+
+            {isAdmin && !isOwnListing && onAdminDelete && (
+              <div className="admin-actions">
+                {!confirmDelete ? (
+                  <button 
+                    className="btn-danger admin-delete-btn"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    🛡️ Admin: Remove Listing
+                  </button>
+                ) : (
+                  <div className="confirm-delete">
+                    <p>Are you sure you want to delete this listing?</p>
+                    <div className="action-buttons">
+                      <button className="ghost" onClick={() => setConfirmDelete(false)}>
+                        Cancel
+                      </button>
+                      <button className="btn-danger" onClick={onAdminDelete}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -543,6 +572,13 @@ export function Browse() {
           onMakeOffer={handleMakeOffer}
           isFavorite={favorites.has(selectedListing.id)}
           onToggleFavorite={() => handleToggleFavorite(selectedListing.id)}
+          onAdminDelete={user?.isAdmin ? async () => {
+            const success = await deleteListing(selectedListing.id);
+            if (success) {
+              setListings(prev => prev.filter(l => l.id !== selectedListing.id));
+              setSelectedListing(null);
+            }
+          } : undefined}
         />
       )}
     </div>

@@ -224,7 +224,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           shareStylePreferences: true,
           emailNotifications: true,
           pushNotifications: true
-        }
+        },
+        isAdmin: dbUser.is_admin || false
       };
 
       setUser(appUser);

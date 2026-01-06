@@ -375,6 +375,47 @@ button {
   color: #d7263d;
 }
 
+.btn-danger {
+  background: #d7263d;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-danger:hover {
+  background: #b01e32;
+}
+
+.ghost.danger {
+  color: #d7263d;
+}
+
+.ghost.danger:hover {
+  background: rgba(215, 38, 61, 0.1);
+}
+
+.admin-actions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.admin-delete-btn {
+  width: 100%;
+}
+
+.confirm-delete {
+  text-align: center;
+}
+
+.confirm-delete p {
+  margin-bottom: 12px;
+  color: #666;
+}
+
 .form-card {
   background: white;
   border-radius: 24px;
