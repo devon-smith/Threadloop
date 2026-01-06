@@ -3416,3 +3416,56 @@ button {
   font-size: 13px;
   padding: 8px 12px;
 }
+
+/* Live Listings Carousel */
+.live-listings-section {
+  overflow: hidden;
+}
+
+.carousel-container {
+  width: 100%;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+
+.carousel-track {
+  display: flex;
+  gap: 24px;
+  animation: scroll-left 30s linear infinite;
+  width: max-content;
+}
+
+.carousel-track:hover {
+  animation-play-state: paused;
+}
+
+.carousel-item {
+  flex-shrink: 0;
+  width: 280px;
+}
+
+.carousel-item .card {
+  height: 100%;
+  margin: 0;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 768px) {
+  .carousel-item {
+    width: 240px;
+  }
+  
+  .carousel-track {
+    gap: 16px;
+    animation-duration: 25s;
+  }
+}

@@ -130,39 +130,45 @@ export function Home() {
           </div>
         </section>
 
-        <section>
+        <section className="live-listings-section">
           <div className="section-header">
             <h2>Live listings</h2>
             <span>{data.length} available</span>
           </div>
           {loading && <p>Loading listings…</p>}
           {error && <p className="error">{error}</p>}
-          <div className="grid">
-            {data.slice(0, 6).map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
-            ))}
-            {!loading && data.length === 0 && !error && (
-              <div className="empty-listings">
-                <p>No listings yet. Add some sample data to get started!</p>
-                <button
-                  className="cta-primary"
-                  onClick={handleSeedListings}
-                  disabled={seeding}
-                >
-                  {seeding ? 'Adding samples...' : 'Load Sample Listings'}
-                </button>
-                {seedMessage && (
-                  <p className={`seed-message ${seedMessage.includes('Added') ? 'success' : ''}`}>
-                    {seedMessage}
-                  </p>
-                )}
+          {!loading && data.length === 0 && !error && (
+            <div className="empty-listings">
+              <p>No listings yet. Add some sample data to get started!</p>
+              <button
+                className="cta-primary"
+                onClick={handleSeedListings}
+                disabled={seeding}
+              >
+                {seeding ? 'Adding samples...' : 'Load Sample Listings'}
+              </button>
+              {seedMessage && (
+                <p className={`seed-message ${seedMessage.includes('Added') ? 'success' : ''}`}>
+                  {seedMessage}
+                </p>
+              )}
+            </div>
+          )}
+          {data.length > 0 && (
+            <div className="carousel-container">
+              <div className="carousel-track">
+                {[...data, ...data].map((listing, idx) => (
+                  <div key={`${listing.id}-${idx}`} className="carousel-item">
+                    <ListingCard listing={listing} />
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-          {data.length > 6 && (
-            <div className="actions" style={{ marginTop: '2rem' }}>
+            </div>
+          )}
+          {data.length > 0 && (
+            <div className="actions" style={{ marginTop: '2rem', textAlign: 'center' }}>
               <button className="cta-secondary" onClick={() => navigate('/browse')}>
-                View all {data.length} listings
+                View all listings
               </button>
             </div>
           )}
