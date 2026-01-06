@@ -89,6 +89,9 @@ export type UserProfile = {
     emailNotifications: boolean;
     pushNotifications: boolean;
   };
+
+  // Admin access
+  isAdmin?: boolean;
 };
 
 export type Rating = {

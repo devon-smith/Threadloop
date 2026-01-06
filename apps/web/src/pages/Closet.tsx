@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Listing } from '@threadloop/shared';
 import { useAuth } from '../context/AuthContext';
-import { fetchMyListings, createListing, updateListingStatus } from '../lib/listings';
+import { fetchMyListings, createListing, updateListing, updateListingStatus, deleteListing } from '../lib/listings';
 import { generateListingSuggestions, suggestPrice, getCategoryDemand } from '../lib/aiSuggestions';
 import { seedSampleListings, checkSampleListingsExist } from '../lib/seedListings';
 import { createImagePreview, SUPPORTED_IMAGE_TYPES, SUPPORTED_FORMATS_TEXT, isHeicFile } from '../lib/imageUtils';
@@ -49,11 +49,13 @@ const getSizesForCategory = (category: string) => {
 function ListingCard({
   listing,
   owned = false,
-  onStatusChange
+  onStatusChange,
+  onEdit
 }: {
   listing: Listing;
   owned?: boolean;
   onStatusChange?: (status: 'active' | 'cancelled') => void;
+  onEdit?: () => void;
 }) {
   const priceLabel = useMemo(() => {
     if (listing.price) {
@@ -86,14 +88,21 @@ function ListingCard({
       {listing.brand && <p className="brand">{listing.brand}</p>}
       <p className="meta">Size {listing.size} • {priceLabel}</p>
       <p className="description">{listing.description}</p>
-      {owned && onStatusChange && listing.status === 'active' && (
+      {owned && listing.status === 'active' && (
         <div className="listing-actions">
-          <button
-            className="ghost small"
-            onClick={() => onStatusChange('cancelled')}
-          >
-            Remove Listing
-          </button>
+          {onEdit && (
+            <button className="ghost small" onClick={onEdit}>
+              Edit
+            </button>
+          )}
+          {onStatusChange && (
+            <button
+              className="ghost small danger"
+              onClick={() => onStatusChange('cancelled')}
+            >
+              Remove
+            </button>
+          )}
         </div>
       )}
     </article>
@@ -103,14 +112,29 @@ function ListingCard({
 function NewListingForm({
   userId,
   campusId,
+  sizingProfile,
   onCreated,
   onCancel
 }: {
   userId: string;
   campusId: string;
+  sizingProfile?: {
+    topSize?: string;
+    bottomSize?: string;
+    shoeSize?: string;
+    dressSize?: string;
+  };
   onCreated: (listing: Listing) => void;
   onCancel: () => void;
 }) {
+  // Parse waist/length from bottomSize if available (format: "32x32")
+  const parseBottomSize = (bottomSize?: string) => {
+    if (!bottomSize) return { waist: '32', length: '32' };
+    const match = bottomSize.match(/(\d+)x(\d+)/);
+    if (match) return { waist: match[1], length: match[2] };
+    return { waist: '32', length: '32' };
+  };
+  const defaultBottom = parseBottomSize(sizingProfile?.bottomSize);
   const [form, setForm] = useState<{
     title: string;
     description: string;
@@ -505,6 +529,268 @@ function NewListingForm({
   );
 }
 
+function EditListingForm({
+  listing,
+  onUpdated,
+  onCancel
+}: {
+  listing: Listing;
+  onUpdated: (listing: Listing) => void;
+  onCancel: () => void;
+}) {
+  // Parse waist/length from size if it's in WxL format
+  const parseSize = (size: string) => {
+    const match = size.match(/(\d+)x(\d+)/);
+    if (match) return { waist: match[1], length: match[2], isWaistLength: true };
+    return { waist: '32', length: '32', isWaistLength: false };
+  };
+  const parsedSize = parseSize(listing.size);
+
+  const [form, setForm] = useState({
+    title: listing.title,
+    description: listing.description,
+    category: listing.category,
+    size: parsedSize.isWaistLength ? 'M' : listing.size,
+    waist: parsedSize.waist,
+    length: parsedSize.length,
+    condition: listing.condition,
+    price: listing.price?.toString() || '',
+    swapValue: listing.swapValue?.toString() || '',
+    brand: listing.brand || ''
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>(
+    listing.images?.map(img => img.storageUrl) || []
+  );
+  const MAX_IMAGES = 5;
+
+  const handleChange = (field: keyof typeof form) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const remainingSlots = MAX_IMAGES - images.length;
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+    for (const file of filesToProcess) {
+      try {
+        const preview = await createImagePreview(file);
+        setImages((prev) => [...prev, preview]);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Failed to process image');
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (event?: React.FormEvent) => {
+    event?.preventDefault();
+
+    if (!form.title.trim()) {
+      setMessage('Please enter a title');
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage(null);
+
+    try {
+      const finalSize = usesPantsSizing(form.category)
+        ? `${form.waist}x${form.length}`
+        : form.size;
+
+      const updated = await updateListing(
+        listing.id,
+        {
+          title: form.title.trim(),
+          description: form.description.trim() || 'No description provided.',
+          category: form.category,
+          size: finalSize,
+          condition: form.condition as 'new' | 'like_new' | 'good' | 'fair',
+          brand: form.brand.trim() || undefined,
+          price: form.price ? Number(form.price) : undefined,
+          swapValue: form.swapValue ? Number(form.swapValue) : undefined
+        },
+        images.length > 0 ? images.map(img => ({ storageUrl: img })) : undefined
+      );
+
+      if (updated) {
+        onUpdated(updated);
+      } else {
+        throw new Error('Failed to update listing');
+      }
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Something went wrong.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form className="listing-form" onSubmit={handleSubmit}>
+      <h3>Edit Listing</h3>
+      
+      <div className="image-upload-section">
+        <div className="images-grid">
+          {images.map((img, idx) => (
+            <div key={idx} className="image-preview-item">
+              <img src={img} alt={`Preview ${idx + 1}`} />
+              <button
+                type="button"
+                className="remove-image-btn"
+                onClick={() => removeImage(idx)}
+                aria-label="Remove image"
+              >
+                ×
+              </button>
+              {idx === 0 && <span className="cover-badge">Cover</span>}
+            </div>
+          ))}
+          {images.length < MAX_IMAGES && (
+            <div
+              className="image-upload-slot"
+              onClick={() => document.getElementById('edit-image-input')?.click()}
+            >
+              <span className="upload-icon">+</span>
+              <span>{images.length === 0 ? 'Add photos' : 'Add more'}</span>
+            </div>
+          )}
+        </div>
+        <input
+          id="edit-image-input"
+          type="file"
+          accept={SUPPORTED_IMAGE_TYPES.join(',')}
+          multiple
+          onChange={handleImageUpload}
+          className="hidden-input"
+        />
+      </div>
+
+      <div className="form-fields">
+        <div className="field">
+          <label htmlFor="edit-title">Title *</label>
+          <input
+            id="edit-title"
+            value={form.title}
+            onChange={handleChange('title')}
+            placeholder="What are you selling?"
+            required
+          />
+        </div>
+
+        <div className="form-row">
+          <div className="field">
+            <label htmlFor="edit-category">Category</label>
+            <select id="edit-category" value={form.category} onChange={handleChange('category')}>
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          {usesPantsSizing(form.category) ? (
+            <>
+              <div className="field">
+                <label htmlFor="edit-waist">Waist</label>
+                <select id="edit-waist" value={form.waist} onChange={handleChange('waist')}>
+                  {WAIST_SIZES.map((size: string) => (
+                    <option key={size} value={size}>{size}"</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="edit-length">Length</label>
+                <select id="edit-length" value={form.length} onChange={handleChange('length')}>
+                  {LENGTH_SIZES.map((size: string) => (
+                    <option key={size} value={size}>{size}"</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <div className="field">
+              <label htmlFor="edit-size">Size</label>
+              <select id="edit-size" value={form.size} onChange={handleChange('size')}>
+                {getSizesForCategory(form.category).map((size: string) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="field">
+            <label htmlFor="edit-condition">Condition</label>
+            <select id="edit-condition" value={form.condition} onChange={handleChange('condition')}>
+              <option value="new">New with tags</option>
+              <option value="like_new">Like new</option>
+              <option value="good">Good</option>
+              <option value="fair">Fair</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="field">
+            <label htmlFor="edit-price">Price ($)</label>
+            <input
+              id="edit-price"
+              type="number"
+              value={form.price}
+              onChange={handleChange('price')}
+              placeholder="0"
+              min="0"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="edit-brand">Brand</label>
+            <input
+              id="edit-brand"
+              value={form.brand}
+              onChange={handleChange('brand')}
+              placeholder="Optional"
+            />
+          </div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="edit-description">Description</label>
+          <textarea
+            id="edit-description"
+            value={form.description}
+            onChange={handleChange('description')}
+            rows={3}
+            placeholder="Describe the item..."
+          />
+        </div>
+      </div>
+
+      {message && (
+        <div className={`form-message ${message.includes('success') ? 'success' : 'error'}`}>
+          {message}
+        </div>
+      )}
+
+      <div className="form-actions">
+        <button type="button" className="btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? 'Saving...' : 'Save Changes'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function ListingModal({
   children,
   onClose
@@ -531,6 +817,7 @@ export function Closet() {
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState<Listing | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [seedMessage, setSeedMessage] = useState<string | null>(null);
 
@@ -583,6 +870,17 @@ export function Closet() {
   const handleNewListing = (listing: Listing) => {
     setMyListings((prev) => [listing, ...prev]);
     setIsModalOpen(false);
+  };
+
+  const handleEditListing = (listing: Listing) => {
+    setEditingListing(listing);
+  };
+
+  const handleUpdateListing = (updatedListing: Listing) => {
+    setMyListings((prev) =>
+      prev.map((l) => (l.id === updatedListing.id ? updatedListing : l))
+    );
+    setEditingListing(null);
   };
 
   const handleStatusChange = async (listingId: string, status: 'active' | 'cancelled') => {
@@ -662,6 +960,7 @@ export function Closet() {
                   key={listing.id}
                   listing={listing}
                   owned
+                  onEdit={() => handleEditListing(listing)}
                   onStatusChange={(status) => handleStatusChange(listing.id, status)}
                 />
               ))}
@@ -675,8 +974,19 @@ export function Closet() {
           <NewListingForm
             userId={user.id}
             campusId={user.campusId || '22222222-2222-2222-2222-222222222222'}
+            sizingProfile={user.sizingProfile}
             onCreated={handleNewListing}
             onCancel={() => setIsModalOpen(false)}
+          />
+        </ListingModal>
+      )}
+
+      {editingListing && (
+        <ListingModal onClose={() => setEditingListing(null)}>
+          <EditListingForm
+            listing={editingListing}
+            onUpdated={handleUpdateListing}
+            onCancel={() => setEditingListing(null)}
           />
         </ListingModal>
       )}

@@ -222,6 +222,114 @@ export async function updateListingStatus(
   return true;
 }
 
+// Update listing details
+export async function updateListing(
+  listingId: string,
+  updates: {
+    title?: string;
+    description?: string;
+    category?: string;
+    size?: string;
+    condition?: 'new' | 'like_new' | 'good' | 'fair';
+    brand?: string;
+    price?: number;
+    swapValue?: number;
+  },
+  newImages?: { storageUrl: string; qualityScore?: number }[]
+): Promise<Listing | null> {
+  // Update listing fields
+  const { error: updateError } = await supabase
+    .from('listings')
+    .update({
+      title: updates.title,
+      description: updates.description,
+      category: updates.category,
+      size: updates.size,
+      condition: updates.condition,
+      brand: updates.brand || null,
+      price: updates.price || null,
+      swap_value: updates.swapValue || null,
+      is_swappable: !!updates.swapValue,
+      is_sellable: !!updates.price,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', listingId);
+
+  if (updateError) {
+    console.error('Error updating listing:', updateError);
+    return null;
+  }
+
+  // If new images provided, replace existing images
+  if (newImages && newImages.length > 0) {
+    // Delete existing images
+    await supabase
+      .from('listing_images')
+      .delete()
+      .eq('listing_id', listingId);
+
+    // Upload new images
+    const imageInserts: { listing_id: string; storage_url: string; position: number; quality_score: number | null }[] = [];
+
+    for (let index = 0; index < newImages.length; index++) {
+      const img = newImages[index];
+      let storageUrl = img.storageUrl;
+
+      // If it's a base64 data URL, upload to Supabase Storage
+      if (storageUrl.startsWith('data:')) {
+        const uploadedUrl = await uploadBase64Image(storageUrl, listingId);
+        if (uploadedUrl) {
+          storageUrl = uploadedUrl;
+        } else {
+          console.error('Failed to upload image to storage');
+          continue;
+        }
+      }
+
+      imageInserts.push({
+        listing_id: listingId,
+        storage_url: storageUrl,
+        position: index,
+        quality_score: img.qualityScore || null
+      });
+    }
+
+    if (imageInserts.length > 0) {
+      const { error: imageError } = await supabase
+        .from('listing_images')
+        .insert(imageInserts);
+
+      if (imageError) {
+        console.error('Error adding listing images:', imageError);
+      }
+    }
+  }
+
+  return fetchListing(listingId);
+}
+
+// Delete listing (admin or owner)
+export async function deleteListing(listingId: string): Promise<boolean> {
+  // Delete images first
+  await supabase
+    .from('listing_images')
+    .delete()
+    .eq('listing_id', listingId);
+
+  // Delete the listing
+  const { error } = await supabase
+    .from('listings')
+    .delete()
+    .eq('id', listingId);
+
+  if (error) {
+    console.error('Error deleting listing:', error);
+    return false;
+  }
+
+  return true;
+}
+
 // Add to favorites
 export async function addFavorite(userId: string, listingId: string): Promise<boolean> {
   const { error } = await supabase
