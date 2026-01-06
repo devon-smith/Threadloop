@@ -67,8 +67,14 @@ export async function createImagePreview(file: File): Promise<string> {
     }
   }
 
-  // For supported formats, create object URL directly
-  return URL.createObjectURL(file);
+  // For supported formats, convert to base64 data URL
+  // (blob URLs are session-local and can't be uploaded to storage)
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 // Get supported image types for file input (including HEIC now)
