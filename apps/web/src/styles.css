@@ -1919,19 +1919,23 @@ button {
   }
 }
 
-/* Messages Page */
+/* Messages Page - iMessage-style layout */
 .messages-container {
   display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 24px;
-  height: calc(100vh - 200px);
+  grid-template-columns: 340px 1fr;
+  gap: 0;
+  height: calc(100vh - 180px);
   min-height: 500px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(16, 16, 16, 0.12);
 }
 
 @media (max-width: 900px) {
   .messages-container {
     grid-template-columns: 1fr;
     height: auto;
+    border-radius: 16px;
   }
 
   .message-thread {
@@ -1948,35 +1952,43 @@ button {
 }
 
 .conversations-list {
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 15px 40px rgba(16, 16, 16, 0.08);
+  background: #1c1c1e;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
 
+.conversations-list-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #2c2c2e;
+}
+
+.conversations-list-header h2 {
+  color: white;
+  font-size: 22px;
+  margin: 0;
+}
+
 .conversation-preview {
   display: flex;
-  gap: 14px;
-  padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
+  gap: 12px;
+  padding: 14px 16px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.15s;
   position: relative;
+  border-bottom: 1px solid #2c2c2e;
 }
 
 .conversation-preview:hover {
-  background-color: #f8f6ff;
+  background-color: #2c2c2e;
 }
 
 .conversation-preview.selected {
-  background-color: #f0ecff;
-  border-left: 3px solid #5d3bff;
+  background-color: #3a3a3c;
 }
 
 .conversation-preview.unread {
-  background-color: #fafafa;
+  background-color: rgba(93, 59, 255, 0.15);
 }
 
 .conversation-preview.unread .conversation-name {
@@ -1984,15 +1996,15 @@ button {
 }
 
 .conversation-avatar {
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: linear-gradient(135deg, #5d3bff, #c043ff);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   flex-shrink: 0;
   overflow: hidden;
@@ -2009,7 +2021,7 @@ button {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .conversation-header {
@@ -2021,17 +2033,17 @@ button {
 .conversation-name {
   font-weight: 600;
   font-size: 15px;
-  color: #2d2d2d;
+  color: #ffffff;
 }
 
 .conversation-time {
   font-size: 12px;
-  color: #8a8a8a;
+  color: #8e8e93;
 }
 
 .conversation-listing {
   font-size: 13px;
-  color: #5d3bff;
+  color: #a78bfa;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -2040,14 +2052,14 @@ button {
 
 .conversation-last-message {
   font-size: 14px;
-  color: #6b6b6b;
+  color: #8e8e93;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .you-prefix {
-  color: #8a8a8a;
+  color: #636366;
 }
 
 .unread-indicator {
@@ -2057,10 +2069,10 @@ button {
   transform: translateY(-50%);
   background: #5d3bff;
   color: white;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -2078,21 +2090,20 @@ button {
 }
 
 .message-thread {
-  background: white;
-  border-radius: 20px;
-  box-shadow: 0 15px 40px rgba(16, 16, 16, 0.08);
+  background: #f5f5f7;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .thread-header {
-  padding: 20px 24px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 20px;
+  background: white;
+  border-bottom: 1px solid #e5e5e5;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
@@ -2162,43 +2173,45 @@ button {
 .messages-list {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .message-bubble {
-  max-width: 70%;
-  padding: 12px 16px;
+  max-width: 65%;
+  padding: 10px 14px;
   border-radius: 18px;
   position: relative;
 }
 
 .message-bubble.sent {
   align-self: flex-end;
-  background: linear-gradient(135deg, #5d3bff, #c043ff);
+  background: #007aff;
   color: white;
-  border-bottom-right-radius: 6px;
+  border-bottom-right-radius: 4px;
 }
 
 .message-bubble.received {
   align-self: flex-start;
-  background: #f0f0f0;
-  color: #2d2d2d;
-  border-bottom-left-radius: 6px;
+  background: white;
+  color: #1c1c1e;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 
 .message-bubble p {
   margin: 0;
   font-size: 15px;
   line-height: 1.4;
+  word-wrap: break-word;
 }
 
 .message-time {
   display: block;
   font-size: 11px;
-  margin-top: 6px;
+  margin-top: 4px;
   opacity: 0.7;
 }
 
@@ -2208,26 +2221,27 @@ button {
 
 .message-input-form {
   display: flex;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid #f0f0f0;
-  background: #fafafa;
+  gap: 10px;
+  padding: 12px 16px;
+  background: white;
+  border-top: 1px solid #e5e5e5;
 }
 
 .message-input {
   flex: 1;
-  border: 2px solid #e8e8e8;
-  border-radius: 24px;
-  padding: 12px 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 20px;
+  padding: 10px 16px;
   font-size: 15px;
   font-family: inherit;
-  background: white;
-  transition: border-color 0.2s;
+  background: #f5f5f7;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .message-input:focus {
   outline: none;
-  border-color: #5d3bff;
+  border-color: #007aff;
+  background: white;
 }
 
 .send-button {

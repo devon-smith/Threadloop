@@ -151,7 +151,7 @@ export function Messages() {
           <span>Chat with buyers and sellers</span>
         </div>
 
-        <div className="messages-container">
+        <div className={`messages-container ${selectedConversation ? 'has-selected' : ''}`}>
           {/* Conversations List */}
           <div className="conversations-list">
             {loading ? (
